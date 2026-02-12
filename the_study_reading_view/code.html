@@ -985,12 +985,17 @@
         sentencePlayToken += 1;
         clearHighlight();
 
+        readAllBtn.disabled = true;
+        readAllBtn.innerHTML = '<span class="material-icons-round text-base animate-spin">autorenew</span><span>合成中...</span>';
+
         try {
           const chunks = buildTtsChunks(text);
-          setStatus(`整篇朗读准备中，共 ${chunks.length} 段...`);
+          setStatus(`整篇朗读准备中，共 ${chunks.length} 段，TTS 合成可能需要几秒...`);
           for (let i = 0; i < chunks.length; i += 1) {
-            setStatus(`整篇朗读：第 ${i + 1}/${chunks.length} 段`);
+            setStatus(`整篇朗读：第 ${i + 1}/${chunks.length} 段（合成中...）`);
             const url = await synthesize(chunks[i]);
+            readAllBtn.innerHTML = '<span class="material-icons-round text-base">volume_up</span><span>播放中...</span>';
+            setStatus(`整篇朗读：第 ${i + 1}/${chunks.length} 段（播放中）`);
             audio.src = url;
             await audio.play();
             await waitAudioEnd();
@@ -998,6 +1003,9 @@
           setStatus(`整篇朗读完成。(${lastTtsPath || "TTS"})`);
         } catch (error) {
           setStatus(`整篇朗读失败：${error.message}`);
+        } finally {
+          readAllBtn.disabled = false;
+          readAllBtn.innerHTML = '<span class="material-icons-round text-base">volume_up</span><span>整篇朗读</span>';
         }
       }
 
@@ -1009,7 +1017,7 @@
 
         const token = ++sentencePlayToken;
         sentenceModeRunning = true;
-        sentenceModeBtn.innerHTML = '<span class="material-icons-round text-base">pause</span><span>逐句播放中</span>';
+        sentenceModeBtn.innerHTML = '<span class="material-icons-round text-base animate-spin">autorenew</span><span>合成中...</span>';
 
         try {
           for (let i = 0; i < sentences.length; i += 1) {
@@ -1019,13 +1027,16 @@
             const card = sentencesContainer.querySelector(`.sentence-card[data-index="${i}"]`);
             if (card) card.scrollIntoView({ behavior: "smooth", block: "center" });
 
-            setStatus(`逐句朗读：第 ${i + 1}/${sentences.length} 句`);
+            setStatus(`逐句朗读：第 ${i + 1}/${sentences.length} 句（合成中...）`);
             const url = await synthesize(sentences[i]);
             if (!sentenceModeRunning || token !== sentencePlayToken) break;
 
+            sentenceModeBtn.innerHTML = '<span class="material-icons-round text-base">pause</span><span>播放中...</span>';
+            setStatus(`逐句朗读：第 ${i + 1}/${sentences.length} 句（播放中）`);
             audio.src = url;
             await audio.play();
             await waitAudioEnd();
+            if (sentenceModeRunning) sentenceModeBtn.innerHTML = '<span class="material-icons-round text-base animate-spin">autorenew</span><span>合成中...</span>';
           }
 
           if (token === sentencePlayToken) {
