@@ -116,13 +116,24 @@
       cursor: pointer;
       border-radius: 0.35rem;
       padding: 0 2px;
-      transition: background-color 0.2s ease;
+      transition: background-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
     }
 
     .word-token:hover,
     .word-token:focus-visible {
       background-color: rgba(232, 220, 197, 0.72);
       outline: none;
+    }
+
+    .word-token.word-active {
+      background-color: rgba(194, 94, 0, 0.25);
+      color: #88543B;
+      transform: scale(1.08);
+      border-radius: 0.35rem;
+    }
+
+    .word-token.word-spoken {
+      color: #88543B;
     }
 
     .word-pop {
@@ -982,6 +993,73 @@
         const cards = Array.from(sentencesContainer.querySelectorAll(".sentence-card"));
         cards.forEach((card) => card.classList.remove("active-play"));
         currentHighlighted = -1;
+        clearWordHighlights();
+      }
+
+      let wordHighlightTimer = null;
+
+      function clearWordHighlights() {
+        if (wordHighlightTimer) { clearInterval(wordHighlightTimer); wordHighlightTimer = null; }
+        sentencesContainer.querySelectorAll(".word-active, .word-spoken").forEach((el) => {
+          el.classList.remove("word-active", "word-spoken");
+        });
+      }
+
+      function startWordHighlight(sentenceIndex, durationMs) {
+        clearWordHighlights();
+        const card = sentencesContainer.querySelector(`.sentence-card[data-index="${sentenceIndex}"]`);
+        if (!card) return;
+
+        const wordTokens = Array.from(card.querySelectorAll(".word-token"));
+        if (!wordTokens.length) return;
+
+        // Calculate weight for each word based on character length
+        const weights = wordTokens.map((el) => {
+          const w = (el.dataset.word || el.textContent || "").length;
+          return Math.max(w, 1);
+        });
+        const totalWeight = weights.reduce((a, b) => a + b, 0);
+
+        // Build timeline: [startMs, endMs] for each word
+        let cumMs = 0;
+        const timeline = weights.map((w) => {
+          const start = cumMs;
+          const dur = (w / totalWeight) * durationMs;
+          cumMs += dur;
+          return { start, end: cumMs };
+        });
+
+        const startTime = Date.now();
+        let lastIdx = -1;
+
+        wordHighlightTimer = setInterval(() => {
+          const elapsed = Date.now() - startTime;
+          let currentIdx = -1;
+          for (let j = 0; j < timeline.length; j++) {
+            if (elapsed >= timeline[j].start && elapsed < timeline[j].end) {
+              currentIdx = j;
+              break;
+            }
+          }
+          // After last word
+          if (elapsed >= durationMs) currentIdx = wordTokens.length - 1;
+
+          if (currentIdx !== lastIdx && currentIdx >= 0) {
+            // Remove active from previous
+            if (lastIdx >= 0 && lastIdx < wordTokens.length) {
+              wordTokens[lastIdx].classList.remove("word-active");
+              wordTokens[lastIdx].classList.add("word-spoken");
+            }
+            // Add active to current
+            wordTokens[currentIdx].classList.add("word-active");
+            lastIdx = currentIdx;
+          }
+
+          if (elapsed >= durationMs + 200) {
+            clearInterval(wordHighlightTimer);
+            wordHighlightTimer = null;
+          }
+        }, 60);
       }
 
       async function playWholeArticle() {
@@ -1055,7 +1133,11 @@
               setStatus(`播放被浏览器拦截，请先点击页面任意位置后重试。(${playErr.name})`);
               throw playErr;
             }
+            // Start word-by-word highlight based on audio duration
+            const dur = (audio.duration && isFinite(audio.duration)) ? audio.duration * 1000 : (sentences[i].split(/\s+/).length * 350);
+            startWordHighlight(i, dur);
             await waitAudioEnd();
+            clearWordHighlights();
             if (sentenceModeRunning) sentenceModeBtn.innerHTML = '<span class="material-icons-round text-base animate-spin">autorenew</span><span>合成中...</span>';
           }
 
