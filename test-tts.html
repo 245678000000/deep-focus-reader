@@ -1,100 +1,149 @@
 <!DOCTYPE html>
 <html>
-<head><meta charset="utf-8"><title>TTS Test</title></head>
-<body style="font-family:sans-serif;padding:2rem;">
-<h2>TTS Debug Test</h2>
-<button id="testBtn" style="padding:12px 24px;font-size:16px;">点击测试朗读</button>
-<pre id="log" style="background:#f5f5f5;padding:1rem;margin-top:1rem;white-space:pre-wrap;max-height:400px;overflow:auto;"></pre>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>TTS Debug</title>
+<style>body{font-family:system-ui;padding:1.5rem;max-width:600px;margin:0 auto}
+button{padding:14px 28px;font-size:16px;border:none;background:#2c2925;color:#fff;border-radius:12px;cursor:pointer;margin:4px}
+button:active{transform:scale(0.97)}
+#log{background:#f5f5f5;padding:1rem;margin-top:1rem;white-space:pre-wrap;font-size:13px;border-radius:8px;max-height:60vh;overflow:auto;line-height:1.6}
+.ok{color:green}.err{color:red}.warn{color:orange}
+audio{display:block;margin-top:1rem;width:100%}
+</style></head>
+<body>
+<h2>TTS 朗读调试</h2>
+<p>点击下方按钮逐步测试 TTS 功能</p>
+<div>
+<button id="testProxy">1. 测试 /api/tts-proxy</button>
+<button id="testDirect">2. 测试直连 TTS</button>
+<button id="testPlay">3. 测试音频播放</button>
+<button id="clearLog">清除日志</button>
+</div>
+<audio id="audioPlayer" controls></audio>
+<div id="log"></div>
 <script>
-const log = document.getElementById('log');
-function addLog(msg) {
-  const time = new Date().toLocaleTimeString();
-  log.textContent += `[${time}] ${msg}\n`;
-  log.scrollTop = log.scrollHeight;
-  console.log(msg);
+const logEl = document.getElementById('log');
+const audioPlayer = document.getElementById('audioPlayer');
+
+function log(msg, cls) {
+  const t = new Date().toLocaleTimeString();
+  const span = document.createElement('span');
+  span.className = cls || '';
+  span.textContent = `[${t}] ${msg}\n`;
+  logEl.appendChild(span);
+  logEl.scrollTop = logEl.scrollHeight;
 }
 
-document.getElementById('testBtn').addEventListener('click', async () => {
-  addLog('=== 开始测试 ===');
+document.getElementById('clearLog').onclick = () => { logEl.innerHTML = ''; };
 
-  // Step 1: fetch audio
-  addLog('Step 1: 请求 TTS API...');
+const TEXT = 'The rapid development of artificial intelligence presents both opportunities and challenges.';
+const PAYLOAD = { text: TEXT, voice_name: 'en-US-JennyNeural', style: 'general', rate: '0', pitch: '0' };
+
+let lastBlobUrl = null;
+
+async function testEndpoint(url, label) {
+  log(`--- ${label} ---`);
+  log(`URL: ${url}`);
+  log(`发送请求...`);
+
   try {
-    const resp = await fetch('/api/tts-proxy', {
+    const t0 = Date.now();
+    const resp = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        text: 'Hello, this is a test.',
-        voice_name: 'en-US-JennyNeural',
-        style: 'general',
-        rate: '0',
-        pitch: '0'
-      })
+      body: JSON.stringify(PAYLOAD)
     });
-    addLog(`Step 1 结果: HTTP ${resp.status}, Content-Type: ${resp.headers.get('content-type')}`);
+
+    const elapsed = Date.now() - t0;
+    log(`响应: HTTP ${resp.status} (${elapsed}ms)`, resp.ok ? 'ok' : 'err');
+
+    const ct = resp.headers.get('content-type') || '(none)';
+    log(`Content-Type: ${ct}`);
 
     if (!resp.ok) {
-      const txt = await resp.text();
-      addLog('错误详情: ' + txt.slice(0, 300));
-      return;
+      const errText = await resp.text();
+      log(`错误内容: ${errText.slice(0, 300)}`, 'err');
+      return null;
     }
 
-    const contentType = resp.headers.get('content-type') || '';
-    addLog('Content-Type: ' + contentType);
+    if (!ct.toLowerCase().includes('audio')) {
+      const text = await resp.text();
+      log(`不是音频! 内容: ${text.slice(0, 300)}`, 'err');
+      return null;
+    }
 
-    // Step 2: create blob
     const blob = await resp.blob();
-    addLog(`Step 2: Blob 大小 = ${blob.size} bytes, type = "${blob.type}"`);
+    log(`Blob: size=${blob.size}, type="${blob.type}"`, blob.size > 0 ? 'ok' : 'err');
 
     if (blob.size === 0) {
-      addLog('错误: Blob 为空!');
-      return;
+      log('Blob 为空!', 'err');
+      return null;
     }
 
-    // Step 3: create object URL
-    const url = URL.createObjectURL(blob);
-    addLog('Step 3: ObjectURL = ' + url);
+    if (lastBlobUrl) URL.revokeObjectURL(lastBlobUrl);
+    lastBlobUrl = URL.createObjectURL(blob);
+    log(`ObjectURL: ${lastBlobUrl}`, 'ok');
 
-    // Step 4: play audio
-    const audio = new Audio();
-    addLog('Step 4: 创建 Audio 对象...');
+    // Set in audio player for manual test
+    audioPlayer.src = lastBlobUrl;
+    log('已设置到页面上的 <audio> 播放器，可手动点击播放', 'ok');
 
-    audio.addEventListener('loadedmetadata', () => {
-      addLog('事件: loadedmetadata, duration = ' + audio.duration);
-    });
-    audio.addEventListener('canplay', () => {
-      addLog('事件: canplay');
-    });
-    audio.addEventListener('playing', () => {
-      addLog('事件: playing');
-    });
-    audio.addEventListener('ended', () => {
-      addLog('事件: ended (播放完成!)');
-    });
-    audio.addEventListener('error', (e) => {
-      addLog('事件: error! code=' + (audio.error ? audio.error.code + ' msg=' + audio.error.message : 'unknown'));
-    });
-    audio.addEventListener('stalled', () => {
-      addLog('事件: stalled (数据加载停滞)');
-    });
-    audio.addEventListener('waiting', () => {
-      addLog('事件: waiting');
-    });
-
-    audio.src = url;
-    addLog('Step 4: 设置 src, 调用 play()...');
-
-    try {
-      await audio.play();
-      addLog('Step 4: play() 成功返回!');
-    } catch (err) {
-      addLog('Step 4: play() 失败! ' + err.name + ': ' + err.message);
-    }
-
+    return lastBlobUrl;
   } catch (err) {
-    addLog('请求失败: ' + err.name + ': ' + err.message);
+    log(`请求异常: ${err.name}: ${err.message}`, 'err');
+    return null;
   }
-});
+}
+
+document.getElementById('testProxy').onclick = () => testEndpoint('/api/tts-proxy', '代理 /api/tts-proxy');
+
+document.getElementById('testDirect').onclick = () => testEndpoint('https://tts-webs.vercel.app/api/synthesize', '直连 TTS');
+
+document.getElementById('testPlay').onclick = async () => {
+  log('--- 测试音频播放 ---');
+
+  if (!lastBlobUrl) {
+    log('请先点击按钮1或2获取音频', 'warn');
+    return;
+  }
+
+  const audio = new Audio();
+
+  audio.addEventListener('loadstart', () => log('事件: loadstart'));
+  audio.addEventListener('loadedmetadata', () => log(`事件: loadedmetadata, duration=${audio.duration}s`, 'ok'));
+  audio.addEventListener('canplay', () => log('事件: canplay', 'ok'));
+  audio.addEventListener('playing', () => log('事件: playing ▶️', 'ok'));
+  audio.addEventListener('timeupdate', function handler() {
+    log(`事件: timeupdate, currentTime=${audio.currentTime.toFixed(2)}s`);
+    audio.removeEventListener('timeupdate', handler);
+    log('(后续 timeupdate 不再打印)');
+  });
+  audio.addEventListener('ended', () => log('事件: ended ✅ 播放完成!', 'ok'));
+  audio.addEventListener('error', () => {
+    const e = audio.error;
+    log(`事件: error ❌ code=${e ? e.code : '?'} msg=${e ? e.message : '?'}`, 'err');
+  });
+  audio.addEventListener('stalled', () => log('事件: stalled (加载停滞)', 'warn'));
+  audio.addEventListener('suspend', () => log('事件: suspend'));
+  audio.addEventListener('waiting', () => log('事件: waiting', 'warn'));
+  audio.addEventListener('abort', () => log('事件: abort', 'warn'));
+
+  audio.src = lastBlobUrl;
+  log(`设置 src = ${lastBlobUrl}`);
+  log('调用 audio.play()...');
+
+  try {
+    const playPromise = audio.play();
+    log(`play() 返回: ${playPromise ? 'Promise' : typeof playPromise}`);
+    if (playPromise && playPromise.then) {
+      await playPromise;
+      log('play() Promise resolved ✅', 'ok');
+    }
+  } catch (err) {
+    log(`play() 失败 ❌: ${err.name}: ${err.message}`, 'err');
+    if (err.name === 'NotAllowedError') {
+      log('浏览器自动播放策略阻止了播放，请先与页面交互', 'warn');
+    }
+  }
+};
 </script>
 </body>
 </html>
