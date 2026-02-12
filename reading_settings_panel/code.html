@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Deep Focus Reader - 阅读设置面板" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📖</text></svg>" />
+  <title>Deep Focus Reader - Reading Settings Panel</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,600;1,400&family=Noto+Serif+SC:wght@300;400;500&family=Space+Grotesk:wght@300;400;500;600&family=Spectral:wght@400;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            "primary": "#2c2925",
+            "background-light": "#f9f8f4",
+            "background-dark": "#1a1918",
+            "accent-gold": "#E8DCC5",
+            "accent-sienna": "#C25E00",
+            "accent-sienna-deep": "#88543B",
+            "paper-texture": "#fdfbf7",
+            "text-english": "#3A3530",
+            "text-chinese": "#8C867D"
+          },
+          fontFamily: {
+            "display": ["Space Grotesk", "sans-serif"],
+            "english": ["Crimson Pro", "serif"],
+            "chinese": ["Noto Serif SC", "serif"],
+            "serif-header": ["Spectral", "serif"]
+          },
+          borderRadius: {
+            "DEFAULT": "1rem",
+            "lg": "2rem",
+            "xl": "3rem",
+            "full": "9999px"
+          },
+          backgroundImage: {
+            "paper-grain": "url('data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.65%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22 opacity=%220.04%22/%3E%3C/svg%3E')"
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    :root {
+      --en-size: 19px;
+      --cn-size: 16px;
+      --line-height: 1.8;
+    }
+
+    .no-scrollbar::-webkit-scrollbar {
+      display: none;
+    }
+
+    .no-scrollbar {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+
+    .active-sentence-glow {
+      box-shadow: 0 0 20px rgba(232, 220, 197, 0.32);
+    }
+
+    .reading-english {
+      font-size: var(--en-size);
+      line-height: var(--line-height);
+    }
+
+    .reading-chinese {
+      font-size: var(--cn-size);
+      line-height: var(--line-height);
+    }
+
+    [data-bilingual="english-only"] .reading-chinese {
+      display: none;
+    }
+
+    [data-bilingual="chinese-only"] .reading-english {
+      display: none;
+    }
+
+    [data-bilingual="hover-cn"] .reading-chinese {
+      max-height: 0;
+      opacity: 0;
+      overflow: hidden;
+      transform: translateY(-4px);
+      pointer-events: none;
+      transition: max-height 0.25s ease, opacity 0.25s ease, transform 0.25s ease;
+      margin: 0;
+    }
+
+    [data-bilingual="hover-cn"] .sentence:hover .reading-chinese,
+    [data-bilingual="hover-cn"] .sentence:focus-within .reading-chinese {
+      max-height: 220px;
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+      margin-top: 0.75rem;
+    }
+
+    #appRoot[data-theme="parchment"] .reader-surface {
+      background-color: #f9f8f4;
+      background-image: url('data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22n%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.6%22 numOctaves=%222%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23n)%22 opacity=%220.045%22/%3E%3C/svg%3E');
+    }
+
+    #appRoot[data-theme="dark"] .reader-surface {
+      background-color: #1a1918;
+      background-image: none;
+    }
+
+    #appRoot[data-theme="clean"] .reader-surface {
+      background-color: #ffffff;
+      background-image: none;
+    }
+
+    .drawer-hidden {
+      transform: translateX(100%);
+    }
+
+    .drawer-visible {
+      transform: translateX(0%);
+    }
+
+    .settings-chip[aria-pressed="true"] {
+      background-color: #2c2925;
+      color: #f2f0e9;
+      border-color: transparent;
+      box-shadow: 0 2px 8px rgba(44, 41, 37, 0.12);
+    }
+
+    .theme-card[aria-pressed="true"] {
+      border-color: #c25e00;
+      box-shadow: 0 2px 8px rgba(194, 94, 0, 0.2);
+      transform: translateY(-2px);
+    }
+
+    .surface-card {
+      box-shadow: 0 2px 8px rgba(44, 41, 37, 0.04);
+    }
+
+    @media (max-width: 640px) {
+      .mobile-safe-bottom {
+        padding-bottom: 6rem;
+      }
+    }
+  </style>
+</head>
+<body id="appRoot" data-theme="parchment" data-bilingual="parallel" class="bg-background-light dark:bg-background-dark text-primary font-display h-screen overflow-hidden">
+  <div class="h-full flex">
+    <nav class="hidden sm:flex w-16 h-full flex-col items-center py-8 bg-white/50 dark:bg-primary/5 backdrop-blur-sm border-r border-primary/5 shrink-0">
+      <div class="mb-8">
+        <div class="w-10 h-10 bg-primary text-white rounded-xl flex items-center justify-center font-bold text-xl shadow-lg">D</div>
+      </div>
+      <div class="flex-1 flex flex-col gap-5 w-full items-center">
+        <button aria-label="Library" class="w-11 h-11 min-h-[44px] min-w-[44px] flex items-center justify-center text-primary/40 hover:text-primary hover:bg-primary/5 rounded-xl transition-all hover:scale-105 active:scale-95">
+          <span class="material-icons-round">library_books</span>
+        </button>
+        <button aria-label="Reading view" class="w-11 h-11 min-h-[44px] min-w-[44px] flex items-center justify-center text-primary bg-primary/10 rounded-xl transition-all hover:scale-105 active:scale-95">
+          <span class="material-icons-round">auto_stories</span>
+        </button>
+        <button aria-label="Vocabulary" class="w-11 h-11 min-h-[44px] min-w-[44px] flex items-center justify-center text-primary/40 hover:text-primary hover:bg-primary/5 rounded-xl transition-all hover:scale-105 active:scale-95">
+          <span class="material-icons-round">school</span>
+        </button>
+        <button aria-label="Stats" class="w-11 h-11 min-h-[44px] min-w-[44px] flex items-center justify-center text-primary/40 hover:text-primary hover:bg-primary/5 rounded-xl transition-all hover:scale-105 active:scale-95">
+          <span class="material-icons-round">analytics</span>
+        </button>
+      </div>
+      <button aria-label="Settings" class="w-11 h-11 min-h-[44px] min-w-[44px] flex items-center justify-center text-primary/40 hover:text-primary hover:bg-primary/5 rounded-xl transition-all hover:scale-105 active:scale-95">
+        <span class="material-icons-round">settings</span>
+      </button>
+    </nav>
+
+    <main class="reader-surface flex-1 h-full relative overflow-y-auto no-scrollbar bg-paper-grain">
+      <header class="sticky top-0 z-20 px-4 sm:px-8 py-4 flex justify-between items-center bg-background-light/80 dark:bg-background-dark/80 backdrop-blur-md border-b border-primary/5 dark:border-white/10">
+        <div class="text-sm font-display text-primary/60 dark:text-white/70 flex items-center gap-1.5 sm:gap-2 truncate">
+          <span class="truncate">Cognitive Horizons</span>
+          <span class="material-icons-round text-xs">chevron_right</span>
+          <span class="text-primary dark:text-white font-medium truncate">Chapter 4: Perception</span>
+        </div>
+        <div class="flex items-center gap-2 sm:gap-3">
+          <button
+            id="settingsToggle"
+            aria-controls="settingsDrawer"
+            aria-expanded="false"
+            aria-label="Open reading settings"
+            class="min-h-[44px] min-w-[44px] px-3 rounded-full text-primary/70 dark:text-white/70 hover:text-primary dark:hover:text-white hover:bg-primary/5 dark:hover:bg-white/10 transition-all duration-300 hover:scale-105 active:scale-95 text-sm font-medium flex items-center gap-1"
+          >
+            <span class="material-icons-round text-base">text_fields</span>
+            <span>Aa</span>
+          </button>
+          <button aria-label="Bookmark" class="min-h-[44px] min-w-[44px] h-11 w-11 flex items-center justify-center rounded-full text-primary/50 dark:text-white/60 hover:text-primary dark:hover:text-white hover:bg-primary/5 dark:hover:bg-white/10 transition-all duration-300 hover:scale-105 active:scale-95">
+            <span class="material-icons-round">bookmark_border</span>
+          </button>
+        </div>
+      </header>
+
+      <div class="max-w-[820px] mx-auto px-4 sm:px-8 pb-32 pt-8 mobile-safe-bottom">
+        <div class="mb-12 sm:mb-16 text-center">
+          <h1 class="font-english text-4xl md:text-5xl text-primary dark:text-white mb-3 sm:mb-4 font-semibold tracking-tight">Cognitive Horizons</h1>
+          <p class="font-chinese text-lg text-primary/60 dark:text-white/70 font-light">认知视野</p>
+          <div class="mt-8 flex justify-center"><div class="h-[1px] w-24 bg-primary/20 dark:bg-white/20"></div></div>
+        </div>
+
+        <article class="space-y-8 sm:space-y-10" aria-label="Bilingual reading content">
+          <div tabindex="0" class="sentence group cursor-pointer hover:bg-primary/5 dark:hover:bg-white/5 rounded-lg p-4 -mx-4 transition-all duration-300">
+            <p class="reading-english font-english text-text-english dark:text-white/90 mb-3">The rapid development of artificial intelligence presents both opportunities and challenges for modern society.</p>
+            <p class="reading-chinese font-chinese text-text-chinese dark:text-white/65 font-light">人工智能的快速发展给现代社会既带来了机遇，也带来了挑战。</p>
+          </div>
+
+          <div tabindex="0" class="sentence relative active-sentence-glow rounded-lg p-4 -mx-4">
+            <div class="absolute inset-0 bg-accent-gold/45 dark:bg-accent-gold/20 rounded-lg -z-10"></div>
+            <p class="reading-english font-english text-text-english dark:text-white font-semibold mb-3">We must consider not only the economic implications but also the ethical frameworks required to govern these intelligent systems.</p>
+            <p class="reading-chinese font-chinese text-text-chinese dark:text-white/75">我们不仅要考虑经济影响，还要考虑管理这些智能系统所需的伦理框架。</p>
+          </div>
+
+          <div tabindex="0" class="sentence group cursor-pointer hover:bg-primary/5 dark:hover:bg-white/5 rounded-lg p-4 -mx-4 transition-all duration-300">
+            <p class="reading-english font-english text-text-english dark:text-white/90 mb-3">Adaptive algorithms can tailor content to individual student needs, fostering deeper engagement and retention.</p>
+            <p class="reading-chinese font-chinese text-text-chinese dark:text-white/65 font-light">自适应算法可以根据学生的个人需求定制内容，从而促进更深入的参与和记忆。</p>
+          </div>
+
+          <div tabindex="0" class="sentence group cursor-pointer hover:bg-primary/5 dark:hover:bg-white/5 rounded-lg p-4 -mx-4 transition-all duration-300">
+            <p class="reading-english font-english text-text-english dark:text-white/90 mb-3">Critical thinking and emotional intelligence will likely become more valuable than rote memorization in an AI-augmented world.</p>
+            <p class="reading-chinese font-chinese text-text-chinese dark:text-white/65 font-light">在人工智能增强的世界里，批判性思维和情商可能会变得比死记硬背更有价值。</p>
+          </div>
+        </article>
+
+        <section class="mt-14 bg-white/75 dark:bg-primary/10 backdrop-blur-sm border border-primary/10 dark:border-white/10 rounded-2xl p-5 sm:p-6 surface-card">
+          <h2 class="font-serif-header text-xl text-primary dark:text-white mb-3">Feature Notes / 功能说明</h2>
+          <p class="text-sm text-primary/75 dark:text-white/75 leading-relaxed">This prototype uses design tokens from the existing system: primary (#2c2925), parchment background (#f9f8f4), dark background (#1a1918), accent gold (#E8DCC5), accent sienna (#C25E00 / #88543B), rounded scale (1rem/2rem/3rem/full), and typography pairing of Space Grotesk + Crimson Pro + Noto Serif SC + Spectral. Settings are stored in <code>dfr.readingSettings.v1</code>.</p>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <div class="fixed bottom-5 sm:bottom-8 left-1/2 -translate-x-1/2 z-30">
+    <div class="bg-primary text-white rounded-full px-4 sm:px-6 py-2.5 sm:py-3 shadow-2xl border border-white/10 flex items-center gap-3 sm:gap-5 min-w-[280px] sm:min-w-[360px]">
+      <button aria-label="Previous" class="min-h-[44px] min-w-[44px] h-11 w-11 rounded-full flex items-center justify-center text-white/75 hover:text-white hover:bg-white/10 transition-all duration-300 hover:scale-105 active:scale-95"><span class="material-icons-round">skip_previous</span></button>
+      <button aria-label="Pause" class="min-h-[44px] min-w-[44px] h-11 w-11 rounded-full bg-white text-primary flex items-center justify-center shadow-lg hover:scale-105 active:scale-95 transition-all duration-300"><span class="material-icons-round">pause</span></button>
+      <button aria-label="Next" class="min-h-[44px] min-w-[44px] h-11 w-11 rounded-full flex items-center justify-center text-white/75 hover:text-white hover:bg-white/10 transition-all duration-300 hover:scale-105 active:scale-95"><span class="material-icons-round">skip_next</span></button>
+      <div class="hidden sm:block flex-1">
+        <div class="text-[10px] flex justify-between text-white/65 font-medium"><span>02:14</span><span>15:00</span></div>
+        <div class="h-1.5 mt-1 bg-white/10 rounded-full overflow-hidden"><div class="h-full w-[15%] bg-accent-sienna rounded-full"></div></div>
+      </div>
+    </div>
+  </div>
+
+  <div id="drawerOverlay" class="fixed inset-0 z-40 bg-primary/30 backdrop-blur-sm opacity-0 pointer-events-none transition-opacity duration-300"></div>
+
+  <aside
+    id="settingsDrawer"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="settingsTitle"
+    class="fixed top-0 right-0 z-50 h-full w-full sm:w-[min(420px,92vw)] bg-[#FDFBF7] dark:bg-[#23211e] border-l border-primary/10 dark:border-white/10 shadow-2xl transition-transform duration-300 drawer-hidden overflow-y-auto no-scrollbar"
+  >
+    <div class="p-5 sm:p-6 border-b border-primary/10 dark:border-white/10 flex items-center justify-between sticky top-0 bg-[#FDFBF7]/95 dark:bg-[#23211e]/95 backdrop-blur-sm">
+      <div>
+        <h2 id="settingsTitle" class="font-serif-header text-2xl text-primary dark:text-white">Reading Settings</h2>
+        <p class="text-xs text-primary/60 dark:text-white/60">阅读设置</p>
+      </div>
+      <button id="drawerClose" aria-label="Close settings" class="min-h-[44px] min-w-[44px] h-11 w-11 rounded-full text-primary/60 dark:text-white/70 hover:text-primary dark:hover:text-white hover:bg-primary/5 dark:hover:bg-white/10 transition-all duration-300 hover:scale-105 active:scale-95">
+        <span class="material-icons-round">close</span>
+      </button>
+    </div>
+
+    <div class="p-5 sm:p-6 space-y-7 pb-16">
+      <section class="space-y-3">
+        <div class="flex items-center justify-between">
+          <h3 class="text-sm font-semibold tracking-wide uppercase text-primary/70 dark:text-white/70">English Size / 英文字号</h3>
+          <output id="englishValue" for="englishSize" class="text-sm text-primary/70 dark:text-white/70">19px</output>
+        </div>
+        <input id="englishSize" type="range" min="16" max="28" step="1" class="w-full accent-accent-sienna" aria-label="English font size" />
+      </section>
+
+      <section class="space-y-3">
+        <div class="flex items-center justify-between">
+          <h3 class="text-sm font-semibold tracking-wide uppercase text-primary/70 dark:text-white/70">Chinese Size / 中文字号</h3>
+          <output id="chineseValue" for="chineseSize" class="text-sm text-primary/70 dark:text-white/70">16px</output>
+        </div>
+        <input id="chineseSize" type="range" min="14" max="24" step="1" class="w-full accent-accent-sienna" aria-label="Chinese font size" />
+      </section>
+
+      <section class="space-y-3">
+        <h3 class="text-sm font-semibold tracking-wide uppercase text-primary/70 dark:text-white/70">Line Height / 行高</h3>
+        <div class="grid grid-cols-3 gap-2">
+          <button type="button" data-line-height="1.5" class="settings-chip min-h-[44px] border border-primary/15 dark:border-white/20 rounded-xl text-sm transition-all duration-300 hover:-translate-y-1">1.5</button>
+          <button type="button" data-line-height="1.8" class="settings-chip min-h-[44px] border border-primary/15 dark:border-white/20 rounded-xl text-sm transition-all duration-300 hover:-translate-y-1">1.8</button>
+          <button type="button" data-line-height="2" class="settings-chip min-h-[44px] border border-primary/15 dark:border-white/20 rounded-xl text-sm transition-all duration-300 hover:-translate-y-1">2.0</button>
+        </div>
+      </section>
+
+      <section class="space-y-3">
+        <h3 class="text-sm font-semibold tracking-wide uppercase text-primary/70 dark:text-white/70">Theme / 主题</h3>
+        <div class="grid grid-cols-3 gap-2">
+          <button type="button" data-theme="parchment" class="theme-card min-h-[88px] p-2 border border-primary/15 dark:border-white/20 rounded-xl transition-all duration-300 bg-[#f9f8f4] text-primary">
+            <span class="text-xs font-medium block">Parchment</span>
+            <span class="text-[11px] opacity-70">羊皮纸</span>
+          </button>
+          <button type="button" data-theme="dark" class="theme-card min-h-[88px] p-2 border border-primary/15 dark:border-white/20 rounded-xl transition-all duration-300 bg-[#1a1918] text-white">
+            <span class="text-xs font-medium block">Dark</span>
+            <span class="text-[11px] opacity-70">深色</span>
+          </button>
+          <button type="button" data-theme="clean" class="theme-card min-h-[88px] p-2 border border-primary/15 dark:border-white/20 rounded-xl transition-all duration-300 bg-white text-primary">
+            <span class="text-xs font-medium block">Clean</span>
+            <span class="text-[11px] opacity-70">纯白</span>
+          </button>
+        </div>
+      </section>
+
+      <section class="space-y-3">
+        <h3 class="text-sm font-semibold tracking-wide uppercase text-primary/70 dark:text-white/70">Bilingual Mode / 双语模式</h3>
+        <div class="grid grid-cols-2 gap-2">
+          <button type="button" data-mode="parallel" class="settings-chip min-h-[44px] border border-primary/15 dark:border-white/20 rounded-xl text-sm transition-all duration-300 hover:-translate-y-1">对照 Parallel</button>
+          <button type="button" data-mode="english-only" class="settings-chip min-h-[44px] border border-primary/15 dark:border-white/20 rounded-xl text-sm transition-all duration-300 hover:-translate-y-1">仅英文 EN</button>
+          <button type="button" data-mode="chinese-only" class="settings-chip min-h-[44px] border border-primary/15 dark:border-white/20 rounded-xl text-sm transition-all duration-300 hover:-translate-y-1">仅中文 CN</button>
+          <button type="button" data-mode="hover-cn" class="settings-chip min-h-[44px] border border-primary/15 dark:border-white/20 rounded-xl text-sm transition-all duration-300 hover:-translate-y-1">悬浮中文 Hover CN</button>
+        </div>
+      </section>
+
+      <section class="rounded-2xl bg-primary/5 dark:bg-white/5 border border-primary/10 dark:border-white/10 p-4">
+        <h4 class="text-sm font-semibold text-primary dark:text-white mb-2">Integration Hint / 集成建议</h4>
+        <p class="text-xs text-primary/70 dark:text-white/70 leading-relaxed">Bind the existing <code>Aa</code> button in <code>the_study_reading_view/code.html</code> to this drawer logic. Keep the storage key and CSS variable contract unchanged to avoid drift when merging into the main reading page.</p>
+      </section>
+    </div>
+  </aside>
+
+  <script>
+    (function () {
+      const STORAGE_KEY = "dfr.readingSettings.v1";
+      const THEME_KEY = "dfr_theme";
+      const defaults = {
+        englishSize: 19,
+        chineseSize: 16,
+        lineHeight: 1.8,
+        theme: "parchment",
+        bilingualMode: "parallel"
+      };
+
+      const appRoot = document.getElementById("appRoot");
+      const settingsToggle = document.getElementById("settingsToggle");
+      const settingsDrawer = document.getElementById("settingsDrawer");
+      const drawerOverlay = document.getElementById("drawerOverlay");
+      const drawerClose = document.getElementById("drawerClose");
+
+      const englishSizeInput = document.getElementById("englishSize");
+      const chineseSizeInput = document.getElementById("chineseSize");
+      const englishValue = document.getElementById("englishValue");
+      const chineseValue = document.getElementById("chineseValue");
+
+      let isDrawerOpen = false;
+      let lastFocused = null;
+
+      function loadSettings() {
+        try {
+          const raw = localStorage.getItem(STORAGE_KEY);
+          if (!raw) return { ...defaults };
+          const parsed = JSON.parse(raw);
+          return {
+            englishSize: clamp(Number(parsed.englishSize), 16, 28, defaults.englishSize),
+            chineseSize: clamp(Number(parsed.chineseSize), 14, 24, defaults.chineseSize),
+            lineHeight: sanitizeLineHeight(parsed.lineHeight),
+            theme: sanitizeTheme(parsed.theme),
+            bilingualMode: sanitizeMode(parsed.bilingualMode)
+          };
+        } catch (_error) {
+          return { ...defaults };
+        }
+      }
+
+      function saveSettings(settings) {
+        localStorage.setItem(STORAGE_KEY, JSON.stringify(settings));
+      }
+
+      function clamp(value, min, max, fallback) {
+        if (Number.isNaN(value)) return fallback;
+        return Math.max(min, Math.min(max, value));
+      }
+
+      function sanitizeLineHeight(value) {
+        const allowed = [1.5, 1.8, 2.0];
+        const numeric = Number(value);
+        return allowed.includes(numeric) ? numeric : defaults.lineHeight;
+      }
+
+      function sanitizeTheme(value) {
+        const allowed = ["parchment", "dark", "clean"];
+        return allowed.includes(value) ? value : defaults.theme;
+      }
+
+      function sanitizeMode(value) {
+        const allowed = ["parallel", "english-only", "chinese-only", "hover-cn"];
+        return allowed.includes(value) ? value : defaults.bilingualMode;
+      }
+
+      const state = loadSettings();
+      const storedTheme = localStorage.getItem(THEME_KEY);
+      if (storedTheme === "dark") {
+        state.theme = "dark";
+      } else if (storedTheme === "light" && state.theme === "dark") {
+        state.theme = "parchment";
+      }
+
+      function applyState() {
+        appRoot.style.setProperty("--en-size", `${state.englishSize}px`);
+        appRoot.style.setProperty("--cn-size", `${state.chineseSize}px`);
+        appRoot.style.setProperty("--line-height", state.lineHeight);
+        appRoot.dataset.bilingual = state.bilingualMode;
+        appRoot.dataset.theme = state.theme;
+
+        const rootEl = document.documentElement;
+        if (state.theme === "dark") {
+          rootEl.classList.add("dark");
+          localStorage.setItem(THEME_KEY, "dark");
+        } else {
+          rootEl.classList.remove("dark");
+          localStorage.setItem(THEME_KEY, "light");
+        }
+
+        englishSizeInput.value = String(state.englishSize);
+        chineseSizeInput.value = String(state.chineseSize);
+        englishValue.textContent = `${state.englishSize}px`;
+        chineseValue.textContent = `${state.chineseSize}px`;
+
+        document.querySelectorAll("button[data-line-height]").forEach((button) => {
+          button.setAttribute("aria-pressed", String(Number(button.dataset.lineHeight) === state.lineHeight));
+        });
+
+        document.querySelectorAll("button[data-theme]").forEach((button) => {
+          button.setAttribute("aria-pressed", String(button.dataset.theme === state.theme));
+        });
+
+        document.querySelectorAll("button[data-mode]").forEach((button) => {
+          button.setAttribute("aria-pressed", String(button.dataset.mode === state.bilingualMode));
+        });
+      }
+
+      function openDrawer() {
+        if (isDrawerOpen) return;
+        isDrawerOpen = true;
+        lastFocused = document.activeElement;
+        settingsDrawer.classList.remove("drawer-hidden");
+        settingsDrawer.classList.add("drawer-visible");
+        drawerOverlay.classList.remove("opacity-0", "pointer-events-none");
+        drawerOverlay.classList.add("opacity-100");
+        settingsToggle.setAttribute("aria-expanded", "true");
+
+        const firstControl = settingsDrawer.querySelector("input, button");
+        if (firstControl) firstControl.focus();
+      }
+
+      function closeDrawer() {
+        if (!isDrawerOpen) return;
+        isDrawerOpen = false;
+        settingsDrawer.classList.add("drawer-hidden");
+        settingsDrawer.classList.remove("drawer-visible");
+        drawerOverlay.classList.add("opacity-0", "pointer-events-none");
+        drawerOverlay.classList.remove("opacity-100");
+        settingsToggle.setAttribute("aria-expanded", "false");
+        if (lastFocused && typeof lastFocused.focus === "function") {
+          lastFocused.focus();
+        } else {
+          settingsToggle.focus();
+        }
+      }
+
+      function trapTab(event) {
+        if (!isDrawerOpen || event.key !== "Tab") return;
+        const focusable = settingsDrawer.querySelectorAll(
+          "button, [href], input, select, textarea, [tabindex]:not([tabindex='-1'])"
+        );
+        const visible = Array.from(focusable).filter((el) => !el.hasAttribute("disabled") && el.offsetParent !== null);
+        if (!visible.length) return;
+
+        const first = visible[0];
+        const last = visible[visible.length - 1];
+
+        if (event.shiftKey && document.activeElement === first) {
+          event.preventDefault();
+          last.focus();
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault();
+          first.focus();
+        }
+      }
+
+      settingsToggle.addEventListener("click", () => {
+        if (isDrawerOpen) {
+          closeDrawer();
+        } else {
+          openDrawer();
+        }
+      });
+
+      drawerClose.addEventListener("click", closeDrawer);
+      drawerOverlay.addEventListener("click", closeDrawer);
+
+      englishSizeInput.addEventListener("input", (event) => {
+        state.englishSize = clamp(Number(event.target.value), 16, 28, defaults.englishSize);
+        applyState();
+        saveSettings(state);
+      });
+
+      chineseSizeInput.addEventListener("input", (event) => {
+        state.chineseSize = clamp(Number(event.target.value), 14, 24, defaults.chineseSize);
+        applyState();
+        saveSettings(state);
+      });
+
+      document.querySelectorAll("button[data-line-height]").forEach((button) => {
+        button.addEventListener("click", () => {
+          state.lineHeight = sanitizeLineHeight(button.dataset.lineHeight);
+          applyState();
+          saveSettings(state);
+        });
+      });
+
+      document.querySelectorAll("button[data-theme]").forEach((button) => {
+        button.addEventListener("click", () => {
+          state.theme = sanitizeTheme(button.dataset.theme);
+          applyState();
+          saveSettings(state);
+        });
+      });
+
+      document.querySelectorAll("button[data-mode]").forEach((button) => {
+        button.addEventListener("click", () => {
+          state.bilingualMode = sanitizeMode(button.dataset.mode);
+          applyState();
+          saveSettings(state);
+        });
+      });
+
+      document.addEventListener("keydown", (event) => {
+        if (event.key === "Escape" && isDrawerOpen) {
+          event.preventDefault();
+          closeDrawer();
+          return;
+        }
+        trapTab(event);
+      });
+
+      applyState();
+    })();
+  </script>
+<a href="../index.html" class="fixed bottom-20 right-4 md:bottom-5 md:right-5 z-50 min-h-[44px] px-4 rounded-full bg-primary text-white text-sm shadow-lg hover:scale-105 active:scale-95 transition-all flex items-center">Hub</a>
+<nav class="fixed bottom-0 left-0 right-0 md:hidden bg-white/90 dark:bg-[#23211e]/90 backdrop-blur border-t border-primary/10 dark:border-white/10 flex justify-around py-2 z-50">
+  <a href="../library_dashboard/code.html" class="min-h-[44px] min-w-[44px] flex items-center justify-center text-primary/60"><span class="material-icons-round">library_books</span></a>
+  <a href="../the_study_reading_view/code.html" class="min-h-[44px] min-w-[44px] flex items-center justify-center text-primary"><span class="material-icons-round">auto_stories</span></a>
+  <a href="../vocabulary_insights_sidebar/code.html" class="min-h-[44px] min-w-[44px] flex items-center justify-center text-primary/60"><span class="material-icons-round">school</span></a>
+  <a href="../ingest_and_analysis_modal/code.html" class="min-h-[44px] min-w-[44px] flex items-center justify-center text-primary/60"><span class="material-icons-round">upload_file</span></a>
+</nav>
+</body>
+</html>

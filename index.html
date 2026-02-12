@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Deep Focus Reader - 沉浸式英语阅读学习工具" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📖</text></svg>" />
+  <title>Deep Focus Reader - Module Hub</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Spectral:wght@400;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            primary: "#2c2925",
+            "background-light": "#f9f8f4",
+            "background-dark": "#1a1918",
+            "accent-gold": "#E8DCC5",
+            "accent-sienna": "#C25E00"
+          },
+          fontFamily: {
+            display: ["Space Grotesk", "sans-serif"],
+            header: ["Spectral", "serif"]
+          },
+          borderRadius: {
+            DEFAULT: "1rem",
+            lg: "2rem",
+            xl: "3rem",
+            full: "9999px"
+          }
+        }
+      }
+    };
+  </script>
+</head>
+<body class="min-h-screen bg-background-light text-primary font-display antialiased dark:bg-background-dark dark:text-white">
+  <main class="max-w-6xl mx-auto px-5 py-10 sm:py-14">
+    <header class="flex items-start justify-between gap-4 mb-10">
+      <div>
+        <h1 class="font-header text-4xl sm:text-5xl">Deep Focus Reader</h1>
+        <p class="mt-3 text-primary/70 dark:text-white/70">沉浸式英语阅读学习工具：上传文章 → 英文朗读 → 双语对照 → 点词查词 → 生词复习。</p>
+      </div>
+      <button id="themeBtn" class="min-h-[44px] min-w-[44px] h-11 w-11 rounded-full border border-primary/15 dark:border-white/20 hover:scale-105 active:scale-95 transition-all" aria-label="Toggle theme">
+        <span class="material-icons-round">dark_mode</span>
+      </button>
+    </header>
+
+    <section class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-5">
+      <a href="./library_dashboard/code.html" class="rounded-2xl border border-primary/10 dark:border-white/15 bg-white/70 dark:bg-white/5 p-5 hover:-translate-y-1 hover:shadow-lg transition-all duration-300">
+        <div class="flex items-center gap-2 mb-2"><span class="material-icons-round">library_books</span><h2 class="font-semibold">Library Dashboard</h2></div>
+        <p class="text-sm text-primary/70 dark:text-white/70">我的图书馆：浏览、搜索、筛选所有导入的文章，支持删除和归档。</p>
+      </a>
+
+      <a href="./the_study_reading_view/code.html" class="rounded-2xl border border-primary/10 dark:border-white/15 bg-white/70 dark:bg-white/5 p-5 hover:-translate-y-1 hover:shadow-lg transition-all duration-300">
+        <div class="flex items-center gap-2 mb-2"><span class="material-icons-round">auto_stories</span><h2 class="font-semibold">Reading View</h2></div>
+        <p class="text-sm text-primary/70 dark:text-white/70">核心阅读页：双语对照、TTS 朗读、点词查询收藏、字号行高设置。</p>
+      </a>
+
+      <a href="./vocabulary_insights_sidebar/code.html" class="rounded-2xl border border-primary/10 dark:border-white/15 bg-white/70 dark:bg-white/5 p-5 hover:-translate-y-1 hover:shadow-lg transition-all duration-300">
+        <div class="flex items-center gap-2 mb-2"><span class="material-icons-round">school</span><h2 class="font-semibold">Vocabulary Notebook</h2></div>
+        <p class="text-sm text-primary/70 dark:text-white/70">生词本：查看收藏的单词、发音、释义，闪卡复习巩固。</p>
+      </a>
+
+      <a href="./ingest_and_analysis_modal/code.html" class="rounded-2xl border border-primary/10 dark:border-white/15 bg-white/70 dark:bg-white/5 p-5 hover:-translate-y-1 hover:shadow-lg transition-all duration-300">
+        <div class="flex items-center gap-2 mb-2"><span class="material-icons-round">upload_file</span><h2 class="font-semibold">Import Text</h2></div>
+        <p class="text-sm text-primary/70 dark:text-white/70">上传 PDF/Word/TXT/EPUB 文件，自动解析提取文本并翻译。</p>
+      </a>
+
+      <a href="./text_analysis_report/code.html" class="rounded-2xl border border-primary/10 dark:border-white/15 bg-white/70 dark:bg-white/5 p-5 hover:-translate-y-1 hover:shadow-lg transition-all duration-300">
+        <div class="flex items-center gap-2 mb-2"><span class="material-icons-round">analytics</span><h2 class="font-semibold">Analysis Report</h2></div>
+        <p class="text-sm text-primary/70 dark:text-white/70">文本分析报告演示（待接入动态数据）。</p>
+      </a>
+
+      <a href="./reading_settings_panel/code.html" class="rounded-2xl border border-primary/10 dark:border-white/15 bg-white/70 dark:bg-white/5 p-5 hover:-translate-y-1 hover:shadow-lg transition-all duration-300">
+        <div class="flex items-center gap-2 mb-2"><span class="material-icons-round">text_fields</span><h2 class="font-semibold">Reading Settings</h2></div>
+        <p class="text-sm text-primary/70 dark:text-white/70">字号、行高设置面板（已集成到阅读页面内的抽屉中）。</p>
+      </a>
+
+      <a href="./grammar_analysis_popover/code.html" class="rounded-2xl border border-primary/10 dark:border-white/15 bg-white/70 dark:bg-white/5 p-5 hover:-translate-y-1 hover:shadow-lg transition-all duration-300">
+        <div class="flex items-center gap-2 mb-2"><span class="material-icons-round">rule</span><h2 class="font-semibold">Grammar Popover</h2></div>
+        <p class="text-sm text-primary/70 dark:text-white/70">语法解析浮层演示（待接入 NLP API）。</p>
+      </a>
+    </section>
+
+    <section class="mt-8 rounded-2xl border border-primary/10 dark:border-white/15 bg-white/70 dark:bg-white/5 p-5">
+      <h3 class="font-semibold mb-2">本地运行 / 部署</h3>
+      <p class="text-sm text-primary/70 dark:text-white/70">Reading 页面已使用 <code>/api/tts-proxy</code> 解决跨域，建议用 Vercel 方式运行：</p>
+      <pre class="mt-2 text-sm bg-primary/5 dark:bg-white/10 rounded-xl p-3 overflow-x-auto"><code>cd /Users/tiantian/Downloads/stitch_library_dashboard
+npx vercel dev</code></pre>
+      <p class="mt-2 text-sm text-primary/70 dark:text-white/70">开发地址一般是：<code>http://localhost:3000</code>（控制台会显示实际端口）。</p>
+      <p class="mt-2 text-sm text-primary/70 dark:text-white/70">上线：<code>vercel --prod</code></p>
+    </section>
+  </main>
+
+  <script>
+    (function () {
+      const THEME_KEY = "dfr_theme";
+      const MIGRATION_KEY = "dfr_migration_v1_done";
+
+      function runMigrationV1() {
+        if (localStorage.getItem(MIGRATION_KEY) === "true") return;
+
+        const legacyRaw = localStorage.getItem("dfr_last_imported");
+        if (legacyRaw) {
+          try {
+            const legacy = JSON.parse(legacyRaw);
+            const text = String(legacy.text || legacy.content || "").trim();
+            if (text) {
+              const article = {
+                id: `article_${Date.now()}`,
+                title: String(legacy.title || "Imported Text"),
+                text,
+                translations: legacy.translations && typeof legacy.translations === "object" ? legacy.translations : {},
+                createdAt: legacy.createdAt || new Date().toISOString(),
+                progress: Number(legacy.progress || 0),
+                status: legacy.status || "in_progress",
+                lastSentenceIndex: Number(legacy.lastSentenceIndex || 0),
+                updatedAt: new Date().toISOString()
+              };
+              localStorage.setItem(article.id, JSON.stringify(article));
+            }
+          } catch (_error) {
+            // ignore
+          }
+        }
+
+        localStorage.setItem(MIGRATION_KEY, "true");
+      }
+
+      function applyTheme() {
+        if (localStorage.getItem(THEME_KEY) === "dark") {
+          document.documentElement.classList.add("dark");
+        } else {
+          document.documentElement.classList.remove("dark");
+        }
+      }
+
+      runMigrationV1();
+      applyTheme();
+
+      document.getElementById("themeBtn").addEventListener("click", () => {
+        const isDark = document.documentElement.classList.toggle("dark");
+        localStorage.setItem(THEME_KEY, isDark ? "dark" : "light");
+      });
+    })();
+  </script>
+</body>
+</html>

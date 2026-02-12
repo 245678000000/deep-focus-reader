@@ -1,0 +1,11 @@
+{
+  "name": "deep-focus-reader",
+  "version": "1.0.0",
+  "private": true,
+  "description": "沉浸式英语阅读学习工具 - Deep Focus Reader",
+  "scripts": {
+    "dev": "vercel dev",
+    "build": "echo 'Static site, no build step needed.'",
+    "start": "vercel dev"
+  }
+}

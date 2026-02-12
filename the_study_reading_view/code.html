@@ -1,0 +1,1341 @@
+<!DOCTYPE html>
+<!-- [DONE] P0-2: 双语翻译显示 - 2026-02-12 -->
+<!-- [DONE] P1-1: 词汇收藏与闪卡入口 - 2026-02-12 -->
+<!-- [DONE] P1-2: 阅读进度跟踪 - 2026-02-12 -->
+<!-- [DONE] P1-3: 移动端导航 - 2026-02-12 -->
+<!-- [DONE] FIX: 设置抽屉集成 + 翻译限额提示 + meta - 2026-02-12 -->
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Deep Focus Reader - 沉浸式英语阅读学习工具，支持双语对照、TTS 朗读、点词查询" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📖</text></svg>" />
+  <title>Deep Focus Reader - Reading</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,600;1,400&family=Noto+Serif+SC:wght@300;400;500&family=Space+Grotesk:wght@300;400;500;600;700&family=Spectral:wght@400;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            primary: "#2c2925",
+            "background-light": "#f9f8f4",
+            "background-dark": "#1a1918",
+            "accent-gold": "#E8DCC5",
+            "accent-sienna": "#C25E00",
+            "accent-sienna-deep": "#88543B",
+            "paper-texture": "#fdfbf7",
+            "text-english": "#3A3530",
+            "text-chinese": "#8C867D"
+          },
+          fontFamily: {
+            display: ["Space Grotesk", "sans-serif"],
+            english: ["Crimson Pro", "serif"],
+            chinese: ["Noto Serif SC", "serif"],
+            "serif-header": ["Spectral", "serif"]
+          },
+          borderRadius: {
+            DEFAULT: "1rem",
+            lg: "2rem",
+            xl: "3rem",
+            full: "9999px"
+          },
+          backgroundImage: {
+            "paper-grain": "url('data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.65%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22 opacity=%220.04%22/%3E%3C/svg%3E')"
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    :root {
+      --en-size: 19px;
+      --cn-size: 15px;
+      --line-height: 1.8;
+    }
+
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+    .sentence-card {
+      box-shadow: 0 2px 8px rgba(44, 41, 37, 0.04);
+      transition: transform 0.3s ease, box-shadow 0.3s ease, background-color 0.3s ease;
+    }
+
+    .sentence-card:hover { transform: translateY(-4px); }
+
+    .sentence-card.active-play {
+      background-color: rgba(232, 220, 197, 0.52);
+      box-shadow: 0 0 0 1px rgba(194, 94, 0, 0.24), 0 10px 22px rgba(44, 41, 37, 0.12);
+    }
+
+    .en-line {
+      font-size: var(--en-size);
+      line-height: var(--line-height);
+    }
+
+    .cn-line {
+      font-size: var(--cn-size);
+      line-height: var(--line-height);
+      color: #8c867d;
+      transition: opacity 0.2s ease, max-height 0.2s ease, transform 0.2s ease;
+    }
+
+    #readingRoot[data-reading-mode="english"] .cn-line { display: none; }
+    #readingRoot[data-reading-mode="chinese"] .en-line { display: none; }
+
+    #readingRoot[data-reading-mode="hover-cn"] .cn-line {
+      max-height: 0;
+      opacity: 0;
+      overflow: hidden;
+      transform: translateY(-4px);
+      margin-top: 0;
+      pointer-events: none;
+    }
+
+    #readingRoot[data-reading-mode="hover-cn"] .sentence-card:hover .cn-line,
+    #readingRoot[data-reading-mode="hover-cn"] .sentence-card:focus-within .cn-line {
+      max-height: 180px;
+      opacity: 1;
+      transform: translateY(0);
+      margin-top: 0.5rem;
+      pointer-events: auto;
+    }
+
+    .mode-btn[data-active="true"] {
+      background: #2c2925;
+      color: #f9f8f4;
+      border-color: transparent;
+    }
+
+    .word-token {
+      cursor: pointer;
+      border-radius: 0.35rem;
+      padding: 0 2px;
+      transition: background-color 0.2s ease;
+    }
+
+    .word-token:hover,
+    .word-token:focus-visible {
+      background-color: rgba(232, 220, 197, 0.72);
+      outline: none;
+    }
+
+    .word-pop {
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      transform: translateY(4px);
+    }
+
+    .word-pop.visible {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+
+    .word-pop.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .settings-drawer { transform: translateX(100%); transition: transform 0.3s ease; }
+    .settings-drawer.drawer-open { transform: translateX(0); }
+    .settings-overlay { opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
+    .settings-overlay.overlay-open { opacity: 1; pointer-events: auto; }
+    .settings-chip[aria-pressed="true"] { background: #2c2925; color: #f9f8f4; border-color: transparent; }
+  </style>
+</head>
+<body id="readingRoot" data-reading-mode="english" class="bg-background-light dark:bg-background-dark text-primary font-display h-screen overflow-hidden">
+  <div class="h-full flex">
+    <nav class="hidden md:flex w-16 h-full flex-col items-center py-6 bg-white/55 dark:bg-primary/5 backdrop-blur-sm border-r border-primary/5 shrink-0">
+      <a href="../index.html" class="mb-5 w-10 h-10 bg-primary text-white rounded-xl flex items-center justify-center font-bold text-xl shadow-lg" aria-label="Back to hub">D</a>
+      <div class="flex-1 flex flex-col gap-4 w-full items-center">
+        <a href="../library_dashboard/code.html" class="w-11 h-11 min-h-[44px] min-w-[44px] flex items-center justify-center text-primary/50 hover:text-primary hover:bg-primary/5 rounded-xl transition-all hover:scale-105 active:scale-95" aria-label="Library">
+          <span class="material-icons-round">library_books</span>
+        </a>
+        <a href="./code.html" class="w-11 h-11 min-h-[44px] min-w-[44px] flex items-center justify-center text-primary bg-primary/10 rounded-xl transition-all hover:scale-105 active:scale-95" aria-label="Reading">
+          <span class="material-icons-round">auto_stories</span>
+        </a>
+        <a href="../vocabulary_insights_sidebar/code.html" class="w-11 h-11 min-h-[44px] min-w-[44px] flex items-center justify-center text-primary/50 hover:text-primary hover:bg-primary/5 rounded-xl transition-all hover:scale-105 active:scale-95" aria-label="Vocabulary">
+          <span class="material-icons-round">school</span>
+        </a>
+        <a href="../ingest_and_analysis_modal/code.html" class="w-11 h-11 min-h-[44px] min-w-[44px] flex items-center justify-center text-primary/50 hover:text-primary hover:bg-primary/5 rounded-xl transition-all hover:scale-105 active:scale-95" aria-label="Ingest">
+          <span class="material-icons-round">upload_file</span>
+        </a>
+      </div>
+      <button id="themeToggle" class="w-11 h-11 min-h-[44px] min-w-[44px] rounded-xl text-primary/50 hover:text-primary hover:bg-primary/5 transition-all hover:scale-105 active:scale-95" aria-label="Toggle dark mode">
+        <span class="material-icons-round">dark_mode</span>
+      </button>
+    </nav>
+
+    <main class="flex-1 h-full overflow-hidden flex flex-col">
+      <header class="px-4 sm:px-6 py-4 border-b border-primary/10 dark:border-white/10 bg-background-light/85 dark:bg-background-dark/85 backdrop-blur-md">
+        <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+          <div>
+            <h1 class="font-serif-header text-2xl sm:text-3xl text-primary dark:text-white">Deep Focus Reader</h1>
+            <p id="articleMeta" class="text-sm text-primary/65 dark:text-white/65">输入英文文章、点词查询、整篇朗读、逐句朗读高亮</p>
+          </div>
+          <div class="flex items-center gap-2 text-xs text-primary/60 dark:text-white/65">
+            <button id="openSettingsBtn" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full border border-primary/15 dark:border-white/15 hover:bg-primary/5 dark:hover:bg-white/10 transition-all" type="button">
+              <span class="material-icons-round text-base">text_fields</span>
+              <span>Aa 设置</span>
+            </button>
+            <span class="hidden sm:inline">TTS: <code>/api/tts-proxy</code></span>
+          </div>
+        </div>
+      </header>
+
+      <div class="flex-1 overflow-hidden grid grid-cols-1 xl:grid-cols-[360px_1fr]">
+        <aside class="border-b xl:border-b-0 xl:border-r border-primary/10 dark:border-white/10 p-4 sm:p-5 overflow-y-auto no-scrollbar bg-paper-texture/50 dark:bg-primary/10">
+          <div class="space-y-5 pb-20 xl:pb-6">
+            <section class="rounded-2xl border border-primary/10 dark:border-white/10 bg-white/75 dark:bg-white/5 p-4">
+              <label for="presetSelect" class="block text-sm font-medium mb-2">预设文章 / Presets</label>
+              <div class="flex gap-2">
+                <select id="presetSelect" class="flex-1 rounded-xl border-primary/15 dark:border-white/20 bg-white/90 dark:bg-white/5 text-sm">
+                  <option value="ai_ethics">AI Ethics in Education</option>
+                  <option value="deep_work">The Value of Deep Work</option>
+                  <option value="climate">Climate and Data Science</option>
+                </select>
+                <button id="loadPresetBtn" class="min-h-[44px] px-3 rounded-xl bg-primary text-white text-sm hover:scale-105 active:scale-95 transition-all">载入</button>
+              </div>
+            </section>
+
+            <section class="rounded-2xl border border-primary/10 dark:border-white/10 bg-white/75 dark:bg-white/5 p-4">
+              <label for="articleInput" class="block text-sm font-medium mb-2">输入/粘贴英文文章</label>
+              <textarea id="articleInput" rows="9" class="w-full rounded-xl border-primary/15 dark:border-white/20 bg-white/90 dark:bg-white/5 text-sm leading-relaxed" placeholder="Paste your English article here..."></textarea>
+              <button id="renderArticleBtn" class="mt-3 w-full min-h-[44px] rounded-xl bg-primary text-white text-sm font-medium hover:scale-105 active:scale-95 transition-all">生成阅读视图</button>
+            </section>
+
+            <section class="rounded-2xl border border-primary/10 dark:border-white/10 bg-white/75 dark:bg-white/5 p-4 space-y-3">
+              <h2 class="text-sm font-semibold">朗读设置 / TTS</h2>
+              <div>
+                <label for="voiceSelect" class="block text-xs text-primary/70 dark:text-white/70 mb-1">音色 Voice</label>
+                <select id="voiceSelect" class="w-full rounded-xl border-primary/15 dark:border-white/20 bg-white/90 dark:bg-white/5 text-sm">
+                  <option value="en-US-JennyNeural">美式女声 · en-US-JennyNeural</option>
+                  <option value="en-US-BrianNeural">美式男声 · en-US-BrianNeural</option>
+                  <option value="en-GB-SoniaNeural">英式女声 · en-GB-SoniaNeural</option>
+                  <option value="en-GB-RyanNeural">英式男声 · en-GB-RyanNeural</option>
+                </select>
+              </div>
+              <div>
+                <label for="rateSelect" class="block text-xs text-primary/70 dark:text-white/70 mb-1">语速 Rate</label>
+                <select id="rateSelect" class="w-full rounded-xl border-primary/15 dark:border-white/20 bg-white/90 dark:bg-white/5 text-sm">
+                  <option value="-30">慢速 Slow (-30)</option>
+                  <option value="0" selected>正常 Normal (0)</option>
+                  <option value="30">快速 Fast (30)</option>
+                </select>
+              </div>
+              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                <button id="readAllBtn" class="min-h-[44px] rounded-xl bg-primary text-white text-sm font-medium hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-1.5">
+                  <span class="material-icons-round text-base">volume_up</span>
+                  <span>整篇朗读</span>
+                </button>
+                <button id="sentenceModeBtn" class="min-h-[44px] rounded-xl bg-accent-sienna text-white text-sm font-medium hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-1.5">
+                  <span class="material-icons-round text-base">record_voice_over</span>
+                  <span>逐句朗读</span>
+                </button>
+              </div>
+              <button id="stopBtn" class="w-full min-h-[44px] rounded-xl border border-primary/15 dark:border-white/20 text-sm hover:bg-primary/5 dark:hover:bg-white/10 transition-all">停止播放</button>
+
+              <div class="pt-2 border-t border-primary/10 dark:border-white/10 space-y-2">
+                <p class="text-xs font-medium text-primary/70 dark:text-white/70">双语模式 / Reading Mode</p>
+                <div class="grid grid-cols-2 gap-2">
+                  <button class="mode-btn min-h-[44px] rounded-xl border border-primary/15 dark:border-white/20 text-xs" data-mode="english">英文模式</button>
+                  <button class="mode-btn min-h-[44px] rounded-xl border border-primary/15 dark:border-white/20 text-xs" data-mode="bilingual">双语对照</button>
+                  <button class="mode-btn min-h-[44px] rounded-xl border border-primary/15 dark:border-white/20 text-xs" data-mode="hover-cn">悬浮中文</button>
+                  <button class="mode-btn min-h-[44px] rounded-xl border border-primary/15 dark:border-white/20 text-xs" data-mode="chinese">仅中文</button>
+                </div>
+              </div>
+              <p id="statusText" class="text-xs text-primary/65 dark:text-white/70 leading-relaxed">状态：待机。点击单词可查询音标和中文释义。</p>
+
+              <div class="pt-2 border-t border-primary/10 dark:border-white/10 space-y-2">
+                <p class="text-xs font-medium text-primary/70 dark:text-white/70">AI 工具</p>
+                <div class="grid grid-cols-2 gap-2">
+                  <a id="linkGrammar" href="../grammar_analysis_popover/code.html" class="min-h-[44px] rounded-xl border border-primary/15 dark:border-white/20 text-xs flex items-center justify-center gap-1 hover:bg-primary/5 dark:hover:bg-white/10 transition-all">
+                    <span class="material-icons-round text-sm">rule</span>语法分析
+                  </a>
+                  <a id="linkAnalysis" href="../text_analysis_report/code.html" class="min-h-[44px] rounded-xl border border-primary/15 dark:border-white/20 text-xs flex items-center justify-center gap-1 hover:bg-primary/5 dark:hover:bg-white/10 transition-all">
+                    <span class="material-icons-round text-sm">analytics</span>文本报告
+                  </a>
+                </div>
+              </div>
+            </section>
+          </div>
+        </aside>
+
+        <section id="readingPane" class="relative overflow-y-auto no-scrollbar px-4 sm:px-8 py-6 sm:py-8 pb-28 md:pb-8 bg-paper-grain">
+          <div class="max-w-[900px] mx-auto">
+            <div class="mb-8 text-center">
+              <h2 class="font-serif-header text-3xl sm:text-4xl text-primary dark:text-white">Reading Workspace</h2>
+              <p class="font-chinese text-sm sm:text-base text-primary/60 dark:text-white/70 mt-2">点击单词查询 · 逐句朗读高亮 · 适合跟读训练</p>
+            </div>
+            <div id="sentencesContainer" class="space-y-4"></div>
+          </div>
+
+          <div id="wordPopover" class="word-pop hidden fixed z-50 w-[min(360px,92vw)] rounded-2xl border border-primary/10 dark:border-white/15 bg-[#FDFBF7] dark:bg-[#23211e] shadow-2xl p-4" role="dialog" aria-label="Word definition">
+            <div class="flex items-start justify-between gap-3">
+              <div>
+                <h3 id="wordTitle" class="font-serif-header text-2xl text-primary dark:text-white">Word</h3>
+                <p id="wordPhonetic" class="text-sm text-primary/65 dark:text-white/65">/phonetic/</p>
+              </div>
+              <button id="closeWordBtn" class="min-h-[44px] min-w-[44px] h-11 w-11 rounded-full text-primary/60 dark:text-white/70 hover:bg-primary/5 dark:hover:bg-white/10 transition-all" aria-label="Close word popup">
+                <span class="material-icons-round">close</span>
+              </button>
+            </div>
+            <div class="mt-3 space-y-2">
+              <p class="text-xs uppercase tracking-wider text-primary/50 dark:text-white/50">中文释义</p>
+              <p id="wordCn" class="text-sm font-chinese text-text-chinese dark:text-white/80">加载中...</p>
+              <p class="text-xs uppercase tracking-wider text-primary/50 dark:text-white/50 mt-2">English Gloss</p>
+              <p id="wordEn" class="text-sm text-primary/80 dark:text-white/80">Loading...</p>
+              <button id="saveWordBtn" class="mt-3 w-full min-h-[44px] py-2 rounded-xl bg-primary text-white text-sm hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-1.5">
+                <span class="material-icons-round text-base">bookmark_add</span>
+                <span>保存到生词本</span>
+              </button>
+            </div>
+          </div>
+        </section>
+      </div>
+    </main>
+  </div>
+
+  <a href="../index.html" class="fixed top-4 right-4 z-40 hidden md:flex min-h-[44px] px-4 rounded-full bg-primary text-white text-sm shadow-lg hover:scale-105 active:scale-95 transition-all items-center">Hub</a>
+
+  <div id="settingsOverlay" class="settings-overlay fixed inset-0 z-40 bg-primary/30 backdrop-blur-sm"></div>
+  <aside id="settingsDrawer" class="settings-drawer fixed top-0 right-0 z-50 h-full w-full sm:w-[min(400px,92vw)] bg-[#FDFBF7] dark:bg-[#23211e] border-l border-primary/10 dark:border-white/10 shadow-2xl overflow-y-auto no-scrollbar" role="dialog" aria-modal="true" aria-label="Reading settings">
+    <div class="p-5 border-b border-primary/10 dark:border-white/10 flex items-center justify-between sticky top-0 bg-[#FDFBF7]/95 dark:bg-[#23211e]/95 backdrop-blur-sm z-10">
+      <div>
+        <h2 class="font-serif-header text-2xl text-primary dark:text-white">Reading Settings</h2>
+        <p class="text-xs text-primary/60 dark:text-white/60">阅读设置</p>
+      </div>
+      <button id="closeSettingsBtn" class="min-h-[44px] min-w-[44px] h-11 w-11 rounded-full text-primary/60 dark:text-white/70 hover:bg-primary/5 dark:hover:bg-white/10 transition-all" aria-label="Close settings">
+        <span class="material-icons-round">close</span>
+      </button>
+    </div>
+    <div class="p-5 space-y-6 pb-16">
+      <section class="space-y-3">
+        <div class="flex items-center justify-between">
+          <h3 class="text-sm font-semibold uppercase tracking-wide text-primary/70 dark:text-white/70">English Size / 英文字号</h3>
+          <output id="enSizeValue" class="text-sm text-primary/70 dark:text-white/70">19px</output>
+        </div>
+        <input id="enSizeRange" type="range" min="16" max="28" step="1" value="19" class="w-full accent-accent-sienna" />
+      </section>
+      <section class="space-y-3">
+        <div class="flex items-center justify-between">
+          <h3 class="text-sm font-semibold uppercase tracking-wide text-primary/70 dark:text-white/70">Chinese Size / 中文字号</h3>
+          <output id="cnSizeValue" class="text-sm text-primary/70 dark:text-white/70">15px</output>
+        </div>
+        <input id="cnSizeRange" type="range" min="14" max="24" step="1" value="15" class="w-full accent-accent-sienna" />
+      </section>
+      <section class="space-y-3">
+        <h3 class="text-sm font-semibold uppercase tracking-wide text-primary/70 dark:text-white/70">Line Height / 行高</h3>
+        <div class="grid grid-cols-3 gap-2">
+          <button type="button" data-lh="1.5" class="settings-chip min-h-[44px] border border-primary/15 dark:border-white/20 rounded-xl text-sm transition-all" aria-pressed="false">1.5</button>
+          <button type="button" data-lh="1.8" class="settings-chip min-h-[44px] border border-primary/15 dark:border-white/20 rounded-xl text-sm transition-all" aria-pressed="true">1.8</button>
+          <button type="button" data-lh="2" class="settings-chip min-h-[44px] border border-primary/15 dark:border-white/20 rounded-xl text-sm transition-all" aria-pressed="false">2.0</button>
+        </div>
+      </section>
+    </div>
+  </aside>
+
+  <nav class="fixed bottom-0 left-0 right-0 md:hidden bg-white/90 dark:bg-[#23211e]/90 backdrop-blur border-t border-primary/10 dark:border-white/10 flex justify-around py-2 z-50">
+    <a href="../library_dashboard/code.html" class="min-h-[44px] min-w-[44px] flex items-center justify-center text-primary/60"><span class="material-icons-round">library_books</span></a>
+    <a href="./code.html" class="min-h-[44px] min-w-[44px] flex items-center justify-center text-primary"><span class="material-icons-round">auto_stories</span></a>
+    <a href="../vocabulary_insights_sidebar/code.html" class="min-h-[44px] min-w-[44px] flex items-center justify-center text-primary/60"><span class="material-icons-round">school</span></a>
+    <a href="../ingest_and_analysis_modal/code.html" class="min-h-[44px] min-w-[44px] flex items-center justify-center text-primary/60"><span class="material-icons-round">upload_file</span></a>
+  </nav>
+
+  <script>
+    (function () {
+      const KEYS = {
+        settings: "dfr.readingSettings.v1",
+        readingMode: "readingMode",
+        translationCache: "dfr_translation_cache_v1",
+        vocabulary: "vocabulary",
+        theme: "dfr_theme",
+        migrationDone: "dfr_migration_v1_done"
+      };
+
+      const TTS_ENDPOINT = "https://tts-webs.vercel.app/api/synthesize";
+      const TTS_PROXY_ENDPOINT = "/api/tts-proxy";
+
+      const TRANSLATE_API = "https://google-translate-pro.xingpeng278.workers.dev/v1/chat/completions";
+      const TRANSLATE_KEY = "sk-liutianyi999";
+      const TRANSLATE_MODEL = "google-translate-pro";
+
+      async function callTranslateAPI(text) {
+        const resp = await fetch(TRANSLATE_API, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${TRANSLATE_KEY}`
+          },
+          body: JSON.stringify({
+            model: TRANSLATE_MODEL,
+            messages: [
+              { role: "system", content: "You are a translator. Translate the user message from English to Chinese. Only output the translation, nothing else." },
+              { role: "user", content: text }
+            ]
+          })
+        });
+        if (!resp.ok) throw new Error(`Translate API HTTP ${resp.status}`);
+        const data = await resp.json();
+        const result = data?.choices?.[0]?.message?.content?.trim();
+        if (!result) throw new Error("Empty translation");
+        return result;
+      }
+
+      const PRESETS = {
+        ai_ethics: `The rapid development of artificial intelligence presents both opportunities and challenges for modern society. While automation promises efficiency, it also raises profound questions about the nature of human labor and creativity.\n\nWe must consider not only the economic implications but also the ethical frameworks required to govern these intelligent systems. Without robust guidelines, the potential for misuse increases significantly.\n\nFurthermore, the integration of AI into educational settings offers a chance to personalize learning experiences like never before. Adaptive algorithms can tailor content to individual student needs, fostering deeper engagement.`,
+        deep_work: `Deep work is the ability to focus without distraction on cognitively demanding tasks. It allows you to quickly master complicated information and produce better results in less time.\n\nIn a world filled with notifications and fragmented attention, deep work becomes a superpower. Professionals who cultivate this skill can create rare value and maintain a meaningful sense of progress.\n\nBuilding this habit requires deliberate scheduling, clear boundaries, and regular reflection. Even one uninterrupted hour per day can compound into major long-term growth.`,
+        climate: `Climate science increasingly relies on machine learning to interpret vast datasets from satellites, sensors, and ocean buoys. These models help researchers forecast extreme weather events and improve disaster preparedness.\n\nHowever, prediction quality depends on both data quality and human judgment. Scientists must continuously validate models against real-world outcomes to avoid misleading conclusions.\n\nWhen used responsibly, data-driven climate tools can guide policy, support resilient infrastructure, and protect vulnerable communities.`
+      };
+
+      const presetSelect = document.getElementById("presetSelect");
+      const loadPresetBtn = document.getElementById("loadPresetBtn");
+      const articleInput = document.getElementById("articleInput");
+      const renderArticleBtn = document.getElementById("renderArticleBtn");
+      const voiceSelect = document.getElementById("voiceSelect");
+      const rateSelect = document.getElementById("rateSelect");
+      const readAllBtn = document.getElementById("readAllBtn");
+      const sentenceModeBtn = document.getElementById("sentenceModeBtn");
+      const stopBtn = document.getElementById("stopBtn");
+      const statusText = document.getElementById("statusText");
+      const themeToggle = document.getElementById("themeToggle");
+      const articleMeta = document.getElementById("articleMeta");
+      const sentencesContainer = document.getElementById("sentencesContainer");
+      const readingPane = document.getElementById("readingPane");
+      const modeButtons = Array.from(document.querySelectorAll(".mode-btn"));
+
+      const wordPopover = document.getElementById("wordPopover");
+      const wordTitle = document.getElementById("wordTitle");
+      const wordPhonetic = document.getElementById("wordPhonetic");
+      const wordCn = document.getElementById("wordCn");
+      const wordEn = document.getElementById("wordEn");
+      const closeWordBtn = document.getElementById("closeWordBtn");
+      const saveWordBtn = document.getElementById("saveWordBtn");
+
+      const audio = new Audio();
+      const audioCache = new Map();
+      const dictionaryCache = new Map();
+      let translationCache = loadJson(KEYS.translationCache, {});
+      let translationQueue = Promise.resolve();
+      let lastTranslationRequestAt = 0;
+
+      let currentArticle = null;
+      let sentences = [];
+      let sentenceModeRunning = false;
+      let sentencePlayToken = 0;
+      let currentRenderToken = 0;
+      let currentHighlighted = -1;
+      let lastTtsPath = "";
+      let currentWord = null;
+      let observer = null;
+      let furthestSeenIndex = -1;
+      let progressTimer = null;
+
+      function loadJson(key, fallback) {
+        try {
+          const raw = localStorage.getItem(key);
+          if (!raw) return fallback;
+          return JSON.parse(raw);
+        } catch (_error) {
+          return fallback;
+        }
+      }
+
+      function saveJson(key, value) {
+        localStorage.setItem(key, JSON.stringify(value));
+      }
+
+      function delay(ms) {
+        return new Promise((resolve) => window.setTimeout(resolve, ms));
+      }
+
+      function setStatus(text) {
+        statusText.textContent = `状态：${text}`;
+      }
+
+      function normalizeArticle(raw, idHint) {
+        const id = String(raw.id || idHint || `article_${Date.now()}`);
+        const text = String(raw.text || raw.content || "").trim();
+        const progress = Number.isFinite(Number(raw.progress)) ? Number(raw.progress) : 0;
+        const lastSentenceIndex = Number.isFinite(Number(raw.lastSentenceIndex)) ? Number(raw.lastSentenceIndex) : 0;
+        return {
+          id: id.startsWith("article_") ? id : `article_${id}`,
+          title: String(raw.title || "Untitled Article"),
+          text,
+          translations: raw.translations && typeof raw.translations === "object" ? raw.translations : {},
+          createdAt: raw.createdAt || new Date().toISOString(),
+          progress: Math.max(0, Math.min(100, progress)),
+          status: raw.status || "in_progress",
+          lastSentenceIndex: Math.max(0, lastSentenceIndex),
+          updatedAt: raw.updatedAt || new Date().toISOString()
+        };
+      }
+
+      function runMigrationV1() {
+        if (localStorage.getItem(KEYS.migrationDone) === "true") return;
+
+        const legacyRaw = localStorage.getItem("dfr_last_imported");
+        if (legacyRaw) {
+          try {
+            const legacy = JSON.parse(legacyRaw);
+            const migrated = normalizeArticle({
+              id: legacy.id ? `article_${legacy.id}` : `article_${Date.now()}`,
+              title: legacy.title || "Imported Text",
+              text: legacy.text || legacy.content || "",
+              translations: legacy.translations || {},
+              createdAt: legacy.createdAt || new Date().toISOString(),
+              progress: legacy.progress || 0,
+              status: legacy.status || "in_progress",
+              lastSentenceIndex: legacy.lastSentenceIndex || 0,
+              updatedAt: new Date().toISOString()
+            });
+
+            if (migrated.text) {
+              localStorage.setItem(migrated.id, JSON.stringify(migrated));
+            }
+          } catch (_error) {
+            // ignore legacy parse errors
+          }
+        }
+
+        localStorage.setItem(KEYS.migrationDone, "true");
+      }
+
+      function applyThemeFromStorage() {
+        const settings = loadJson(KEYS.settings, {});
+        const storedTheme = localStorage.getItem(KEYS.theme);
+        let theme = storedTheme;
+        if (!theme && settings.theme) {
+          theme = settings.theme === "dark" ? "dark" : "light";
+        }
+        if (theme === "dark") {
+          document.documentElement.classList.add("dark");
+        } else {
+          document.documentElement.classList.remove("dark");
+        }
+      }
+
+      function toggleTheme() {
+        const isDark = document.documentElement.classList.toggle("dark");
+        localStorage.setItem(KEYS.theme, isDark ? "dark" : "light");
+
+        const settings = loadJson(KEYS.settings, {});
+        settings.theme = isDark ? "dark" : "parchment";
+        saveJson(KEYS.settings, settings);
+      }
+
+      function applyReadingSettings() {
+        const settings = loadJson(KEYS.settings, {});
+        const englishSize = Number(settings.englishSize || 19);
+        const chineseSize = Number(settings.chineseSize || 15);
+        const lineHeight = Number(settings.lineHeight || 1.8);
+
+        const enClamped = Math.max(16, Math.min(28, englishSize));
+        const cnClamped = Math.max(14, Math.min(24, chineseSize));
+        const lhClamped = [1.5, 1.8, 2].includes(lineHeight) ? lineHeight : 1.8;
+
+        document.documentElement.style.setProperty("--en-size", `${enClamped}px`);
+        document.documentElement.style.setProperty("--cn-size", `${cnClamped}px`);
+        document.documentElement.style.setProperty("--line-height", `${lhClamped}`);
+
+        const enRange = document.getElementById("enSizeRange");
+        const cnRange = document.getElementById("cnSizeRange");
+        const enVal = document.getElementById("enSizeValue");
+        const cnVal = document.getElementById("cnSizeValue");
+        if (enRange) { enRange.value = enClamped; enVal.textContent = `${enClamped}px`; }
+        if (cnRange) { cnRange.value = cnClamped; cnVal.textContent = `${cnClamped}px`; }
+
+        document.querySelectorAll("[data-lh]").forEach((btn) => {
+          btn.setAttribute("aria-pressed", String(Number(btn.dataset.lh) === lhClamped));
+        });
+      }
+
+      function openSettingsDrawer() {
+        document.getElementById("settingsDrawer").classList.add("drawer-open");
+        document.getElementById("settingsOverlay").classList.add("overlay-open");
+      }
+
+      function closeSettingsDrawer() {
+        document.getElementById("settingsDrawer").classList.remove("drawer-open");
+        document.getElementById("settingsOverlay").classList.remove("overlay-open");
+      }
+
+      function setupSettingsDrawer() {
+        document.getElementById("openSettingsBtn").addEventListener("click", openSettingsDrawer);
+        document.getElementById("closeSettingsBtn").addEventListener("click", closeSettingsDrawer);
+        document.getElementById("settingsOverlay").addEventListener("click", closeSettingsDrawer);
+
+        document.getElementById("enSizeRange").addEventListener("input", (e) => {
+          const val = Number(e.target.value);
+          const settings = loadJson(KEYS.settings, {});
+          settings.englishSize = val;
+          saveJson(KEYS.settings, settings);
+          applyReadingSettings();
+        });
+
+        document.getElementById("cnSizeRange").addEventListener("input", (e) => {
+          const val = Number(e.target.value);
+          const settings = loadJson(KEYS.settings, {});
+          settings.chineseSize = val;
+          saveJson(KEYS.settings, settings);
+          applyReadingSettings();
+        });
+
+        document.querySelectorAll("[data-lh]").forEach((btn) => {
+          btn.addEventListener("click", () => {
+            const settings = loadJson(KEYS.settings, {});
+            settings.lineHeight = Number(btn.dataset.lh);
+            saveJson(KEYS.settings, settings);
+            applyReadingSettings();
+          });
+        });
+      }
+
+      function splitSentences(text) {
+        return text
+          .replace(/\s+/g, " ")
+          .split(/(?<=[.!?])\s+/)
+          .map((s) => s.trim())
+          .filter(Boolean);
+      }
+
+      function escapeHtml(text) {
+        return text
+          .replace(/&/g, "&amp;")
+          .replace(/</g, "&lt;")
+          .replace(/>/g, "&gt;")
+          .replace(/\"/g, "&quot;")
+          .replace(/'/g, "&#039;");
+      }
+
+      function tokenizeSentence(sentence) {
+        const parts = sentence.match(/[A-Za-z]+(?:'[A-Za-z]+)?|[^A-Za-z]+/g) || [sentence];
+        return parts.map((part) => {
+          if (/^[A-Za-z]+(?:'[A-Za-z]+)?$/.test(part)) {
+            const safe = escapeHtml(part);
+            return `<span class="word-token" tabindex="0" data-word="${safe.toLowerCase()}">${safe}</span>`;
+          }
+          return escapeHtml(part);
+        }).join("");
+      }
+
+      function normalizeTranslationKey(sentence) {
+        return sentence.trim().toLowerCase().replace(/\s+/g, " ");
+      }
+
+      async function translateSentence(sentence) {
+        const key = normalizeTranslationKey(sentence);
+        if (translationCache[key]) {
+          return translationCache[key];
+        }
+
+        const runRequest = async () => {
+          if (translationCache[key]) return translationCache[key];
+
+          const wait = Math.max(0, 500 - (Date.now() - lastTranslationRequestAt));
+          if (wait > 0) await delay(wait);
+
+          lastTranslationRequestAt = Date.now();
+          let translated = "翻译暂不可用";
+
+          try {
+            translated = await callTranslateAPI(sentence);
+          } catch (_error) {
+            translated = "翻译暂不可用（网络错误）";
+          }
+
+          translationCache[key] = translated;
+          saveJson(KEYS.translationCache, translationCache);
+          return translated;
+        };
+
+        translationQueue = translationQueue.then(runRequest, runRequest);
+        return translationQueue;
+      }
+
+      function getReadingModeFromStorage() {
+        const direct = localStorage.getItem(KEYS.readingMode);
+        if (direct) return direct;
+
+        const settings = loadJson(KEYS.settings, {});
+        const map = {
+          parallel: "bilingual",
+          "english-only": "english",
+          "chinese-only": "chinese",
+          "hover-cn": "hover-cn"
+        };
+        return map[settings.bilingualMode] || "english";
+      }
+
+      function syncReadingModeToSettings(mode) {
+        const inverse = {
+          bilingual: "parallel",
+          english: "english-only",
+          chinese: "chinese-only",
+          "hover-cn": "hover-cn"
+        };
+
+        const settings = loadJson(KEYS.settings, {});
+        settings.bilingualMode = inverse[mode] || "english-only";
+        saveJson(KEYS.settings, settings);
+      }
+
+      function setReadingMode(mode) {
+        const allowed = ["english", "bilingual", "hover-cn", "chinese"];
+        const finalMode = allowed.includes(mode) ? mode : "english";
+
+        document.getElementById("readingRoot").dataset.readingMode = finalMode;
+        localStorage.setItem(KEYS.readingMode, finalMode);
+        syncReadingModeToSettings(finalMode);
+
+        modeButtons.forEach((btn) => {
+          const active = btn.dataset.mode === finalMode;
+          btn.dataset.active = String(active);
+          btn.setAttribute("aria-pressed", active ? "true" : "false");
+        });
+      }
+
+      function getAllArticleKeys() {
+        const keys = [];
+        for (let i = 0; i < localStorage.length; i += 1) {
+          const k = localStorage.key(i);
+          if (k && k.startsWith("article_")) keys.push(k);
+        }
+        return keys;
+      }
+
+      function getLatestArticle() {
+        const keys = getAllArticleKeys();
+        if (!keys.length) return null;
+
+        const items = keys
+          .map((k) => {
+            try {
+              return normalizeArticle(JSON.parse(localStorage.getItem(k)), k);
+            } catch (_error) {
+              return null;
+            }
+          })
+          .filter(Boolean)
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+        return items[0] || null;
+      }
+
+      function saveCurrentArticle() {
+        if (!currentArticle || !currentArticle.id) return;
+        currentArticle.updatedAt = new Date().toISOString();
+        localStorage.setItem(currentArticle.id, JSON.stringify(currentArticle));
+      }
+
+      async function populateTranslations(renderToken) {
+        for (let i = 0; i < sentences.length; i += 1) {
+          if (renderToken !== currentRenderToken) return;
+
+          const card = sentencesContainer.querySelector(`.sentence-card[data-index="${i}"]`);
+          if (!card) continue;
+
+          const cnNode = card.querySelector(".cn-line");
+          if (!cnNode) continue;
+
+          let translated = "";
+          if (currentArticle?.translations?.[i]) {
+            translated = currentArticle.translations[i];
+          } else {
+            translated = await translateSentence(sentences[i]);
+            if (currentArticle) {
+              currentArticle.translations[i] = translated;
+            }
+          }
+
+          if (renderToken !== currentRenderToken) return;
+          cnNode.textContent = translated || "翻译暂不可用";
+        }
+
+        if (currentArticle) saveCurrentArticle();
+      }
+
+      function clearObserver() {
+        if (observer) {
+          observer.disconnect();
+          observer = null;
+        }
+      }
+
+      function scheduleProgressPersist() {
+        if (!currentArticle) return;
+        window.clearTimeout(progressTimer);
+        progressTimer = window.setTimeout(() => {
+          const total = Math.max(1, sentences.length);
+          const progress = Math.round(((furthestSeenIndex + 1) / total) * 100);
+
+          currentArticle.lastSentenceIndex = Math.max(currentArticle.lastSentenceIndex || 0, furthestSeenIndex);
+          currentArticle.progress = Math.max(currentArticle.progress || 0, Math.min(100, progress));
+          if (currentArticle.progress >= 100) currentArticle.status = "completed";
+          saveCurrentArticle();
+        }, 800);
+      }
+
+      function setupProgressObserver() {
+        clearObserver();
+        if (!currentArticle) return;
+
+        furthestSeenIndex = Math.max(0, Number(currentArticle.lastSentenceIndex || 0));
+        const cards = Array.from(sentencesContainer.querySelectorAll(".sentence-card"));
+        if (!cards.length) return;
+
+        observer = new IntersectionObserver((entries) => {
+          entries.forEach((entry) => {
+            if (!entry.isIntersecting) return;
+            const idx = Number(entry.target.dataset.index);
+            if (!Number.isFinite(idx)) return;
+            if (idx > furthestSeenIndex) {
+              furthestSeenIndex = idx;
+              scheduleProgressPersist();
+            }
+          });
+        }, {
+          root: readingPane,
+          threshold: 0.45
+        });
+
+        cards.forEach((card) => observer.observe(card));
+
+        const restoreIndex = Math.min(cards.length - 1, Math.max(0, Number(currentArticle.lastSentenceIndex || 0)));
+        if (restoreIndex > 0) {
+          window.setTimeout(() => {
+            cards[restoreIndex]?.scrollIntoView({ behavior: "smooth", block: "center" });
+          }, 180);
+        }
+      }
+
+      function renderArticleFromText(text) {
+        const normalized = String(text || "").trim();
+        if (!normalized) {
+          sentencesContainer.innerHTML = '<div class="rounded-2xl border border-primary/10 dark:border-white/10 bg-white/80 dark:bg-white/5 p-4 text-sm">请输入英文文章内容。</div>';
+          sentences = [];
+          clearObserver();
+          return;
+        }
+
+        stopPlayback({ silent: true });
+        sentences = splitSentences(normalized);
+        currentRenderToken += 1;
+
+        if (!sentences.length) {
+          sentencesContainer.innerHTML = '<div class="rounded-2xl border border-primary/10 dark:border-white/10 bg-white/80 dark:bg-white/5 p-4 text-sm">未识别到完整句子，请检查输入。</div>';
+          clearObserver();
+          return;
+        }
+
+        sentencesContainer.innerHTML = sentences.map((sentence, idx) => `
+          <article data-index="${idx}" class="sentence-card rounded-2xl border border-primary/10 dark:border-white/10 bg-white/75 dark:bg-primary/10 p-4 sm:p-5 leading-relaxed" tabindex="0">
+            <p class="en-line font-english text-text-english dark:text-white/90">${tokenizeSentence(sentence)}</p>
+            <p class="cn-line font-chinese mt-2">翻译加载中...</p>
+          </article>
+        `).join("");
+
+        setStatus(`已渲染 ${sentences.length} 句。正在准备翻译...`);
+
+        const token = currentRenderToken;
+        populateTranslations(token).then(() => {
+          if (token === currentRenderToken) {
+            setStatus(`已渲染 ${sentences.length} 句。点击单词可查词。`);
+          }
+        });
+
+        setupProgressObserver();
+      }
+
+      function applyLoadedArticleMeta() {
+        const linkGrammar = document.getElementById("linkGrammar");
+        const linkAnalysis = document.getElementById("linkAnalysis");
+
+        if (!currentArticle) {
+          articleMeta.textContent = "输入英文文章、点词查询、整篇朗读、逐句朗读高亮";
+          if (linkGrammar) linkGrammar.href = "../grammar_analysis_popover/code.html";
+          if (linkAnalysis) linkAnalysis.href = "../text_analysis_report/code.html";
+          return;
+        }
+
+        articleMeta.textContent = `${currentArticle.title} · 进度 ${Math.round(currentArticle.progress || 0)}% · 状态 ${currentArticle.status === "completed" ? "已完成" : "进行中"}`;
+        const aid = encodeURIComponent(currentArticle.id);
+        if (linkGrammar) linkGrammar.href = `../grammar_analysis_popover/code.html?article=${aid}`;
+        if (linkAnalysis) linkAnalysis.href = `../text_analysis_report/code.html?article=${aid}`;
+      }
+
+      function buildTtsChunks(text, maxLen = 360) {
+        const base = splitSentences(text);
+        if (!base.length) return [text];
+        const chunks = [];
+        let current = "";
+
+        base.forEach((sentence) => {
+          if (!current) {
+            current = sentence;
+          } else if ((current + " " + sentence).length <= maxLen) {
+            current += ` ${sentence}`;
+          } else {
+            chunks.push(current);
+            current = sentence;
+          }
+        });
+        if (current) chunks.push(current);
+        return chunks;
+      }
+
+      async function synthesize(text) {
+        const voice = voiceSelect.value;
+        const rate = rateSelect.value;
+        const key = `${voice}|${rate}|${text}`;
+        if (audioCache.has(key)) return audioCache.get(key);
+
+        const payload = {
+          text,
+          voice_name: voice,
+          style: "general",
+          rate,
+          pitch: "0"
+        };
+
+        const endpoints = [TTS_PROXY_ENDPOINT, TTS_ENDPOINT];
+        let lastError = null;
+
+        for (const endpoint of endpoints) {
+          try {
+            const response = await fetch(endpoint, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(payload)
+            });
+
+            if (!response.ok) {
+              const detail = await response.text();
+              throw new Error(`HTTP ${response.status} ${detail.slice(0, 120)}`);
+            }
+
+            const contentType = String(response.headers.get("content-type") || "");
+            if (!contentType.toLowerCase().startsWith("audio/")) {
+              const detail = await response.text();
+              throw new Error(`Non-audio response: ${contentType || "unknown"} ${detail.slice(0, 120)}`);
+            }
+
+            const blob = await response.blob();
+            const url = URL.createObjectURL(blob);
+            audioCache.set(key, url);
+            lastTtsPath = endpoint;
+            return url;
+          } catch (error) {
+            lastError = error;
+          }
+        }
+
+        const message = String(lastError && lastError.message ? lastError.message : lastError);
+        if (message.toLowerCase().includes("failed to fetch") || message.toLowerCase().includes("networkerror")) {
+          throw new Error("TTS 无法访问（可能是跨域/CORS），请在 Vercel dev 下运行。");
+        }
+        throw new Error(`TTS 调用失败：${message}`);
+      }
+
+      function waitAudioEnd() {
+        return new Promise((resolve, reject) => {
+          const onEnd = () => {
+            cleanup();
+            resolve();
+          };
+          const onError = () => {
+            cleanup();
+            reject(new Error("Audio playback failed"));
+          };
+          const cleanup = () => {
+            audio.removeEventListener("ended", onEnd);
+            audio.removeEventListener("error", onError);
+          };
+
+          audio.addEventListener("ended", onEnd);
+          audio.addEventListener("error", onError);
+        });
+      }
+
+      function highlightSentence(index) {
+        const cards = Array.from(sentencesContainer.querySelectorAll(".sentence-card"));
+        cards.forEach((card, i) => card.classList.toggle("active-play", i === index));
+        currentHighlighted = index;
+      }
+
+      function clearHighlight() {
+        const cards = Array.from(sentencesContainer.querySelectorAll(".sentence-card"));
+        cards.forEach((card) => card.classList.remove("active-play"));
+        currentHighlighted = -1;
+      }
+
+      async function playWholeArticle() {
+        const text = articleInput.value.trim();
+        if (!text) {
+          setStatus("请先输入文章再朗读。");
+          return;
+        }
+
+        sentenceModeRunning = false;
+        sentencePlayToken += 1;
+        clearHighlight();
+
+        try {
+          const chunks = buildTtsChunks(text);
+          setStatus(`整篇朗读准备中，共 ${chunks.length} 段...`);
+          for (let i = 0; i < chunks.length; i += 1) {
+            setStatus(`整篇朗读：第 ${i + 1}/${chunks.length} 段`);
+            const url = await synthesize(chunks[i]);
+            audio.src = url;
+            await audio.play();
+            await waitAudioEnd();
+          }
+          setStatus(`整篇朗读完成。(${lastTtsPath || "TTS"})`);
+        } catch (error) {
+          setStatus(`整篇朗读失败：${error.message}`);
+        }
+      }
+
+      async function playSentenceMode() {
+        if (!sentences.length) {
+          setStatus("请先生成阅读内容。");
+          return;
+        }
+
+        const token = ++sentencePlayToken;
+        sentenceModeRunning = true;
+        sentenceModeBtn.innerHTML = '<span class="material-icons-round text-base">pause</span><span>逐句播放中</span>';
+
+        try {
+          for (let i = 0; i < sentences.length; i += 1) {
+            if (!sentenceModeRunning || token !== sentencePlayToken) break;
+            highlightSentence(i);
+
+            const card = sentencesContainer.querySelector(`.sentence-card[data-index="${i}"]`);
+            if (card) card.scrollIntoView({ behavior: "smooth", block: "center" });
+
+            setStatus(`逐句朗读：第 ${i + 1}/${sentences.length} 句`);
+            const url = await synthesize(sentences[i]);
+            if (!sentenceModeRunning || token !== sentencePlayToken) break;
+
+            audio.src = url;
+            await audio.play();
+            await waitAudioEnd();
+          }
+
+          if (token === sentencePlayToken) {
+            setStatus(`逐句朗读完成。(${lastTtsPath || "TTS"})`);
+          }
+        } catch (error) {
+          setStatus(`逐句朗读失败：${error.message}`);
+        } finally {
+          if (token === sentencePlayToken) {
+            sentenceModeRunning = false;
+            sentenceModeBtn.innerHTML = '<span class="material-icons-round text-base">record_voice_over</span><span>逐句朗读</span>';
+            clearHighlight();
+          }
+        }
+      }
+
+      function stopPlayback(options = {}) {
+        const { silent = false } = options;
+        sentenceModeRunning = false;
+        sentencePlayToken += 1;
+        audio.pause();
+        audio.currentTime = 0;
+        sentenceModeBtn.innerHTML = '<span class="material-icons-round text-base">record_voice_over</span><span>逐句朗读</span>';
+        clearHighlight();
+        if (!silent) setStatus("播放已停止。");
+      }
+
+      function sanitizeWord(raw) {
+        return String(raw || "").toLowerCase().replace(/[^a-z']/g, "");
+      }
+
+      function getVocabulary() {
+        const list = loadJson(KEYS.vocabulary, []);
+        return Array.isArray(list) ? list : [];
+      }
+
+      function setVocabulary(list) {
+        saveJson(KEYS.vocabulary, list);
+      }
+
+      function isWordSaved(word) {
+        return getVocabulary().some((item) => String(item.word || "").toLowerCase() === word.toLowerCase());
+      }
+
+      function updateSaveWordButton(word) {
+        const saved = word && isWordSaved(word);
+        saveWordBtn.disabled = Boolean(saved);
+        saveWordBtn.classList.toggle("bg-primary", !saved);
+        saveWordBtn.classList.toggle("bg-primary/30", Boolean(saved));
+        saveWordBtn.querySelector("span:last-child").textContent = saved ? "已收藏 ✓" : "保存到生词本";
+      }
+
+      async function fetchWordDefinition(word) {
+        if (dictionaryCache.has(word)) return dictionaryCache.get(word);
+
+        const result = {
+          phonetic: "N/A",
+          en: "No definition found.",
+          cn: "暂无中文释义"
+        };
+
+        try {
+          const dictResp = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`);
+          if (dictResp.ok) {
+            const dictData = await dictResp.json();
+            const first = dictData[0] || {};
+            const meanings = first.meanings || [];
+            const firstDef = meanings[0]?.definitions?.[0]?.definition;
+            const phonetic = first.phonetic || (first.phonetics || []).find((p) => p.text)?.text;
+
+            if (phonetic) result.phonetic = phonetic;
+            if (firstDef) result.en = firstDef;
+          }
+        } catch (_error) {
+          // ignore
+        }
+
+        try {
+          const toTranslate = result.en && result.en !== "No definition found." ? result.en : word;
+          result.cn = await callTranslateAPI(toTranslate);
+        } catch (_error) {
+          // ignore
+        }
+
+        dictionaryCache.set(word, result);
+        return result;
+      }
+
+      function showWordPopover(anchorEl) {
+        const rect = anchorEl.getBoundingClientRect();
+        const popW = Math.min(360, window.innerWidth * 0.92);
+
+        let left = rect.left + window.scrollX;
+        if (left + popW > window.scrollX + window.innerWidth - 8) {
+          left = window.scrollX + window.innerWidth - popW - 8;
+        }
+        if (left < 8) left = 8;
+
+        const top = rect.bottom + window.scrollY + 10;
+        wordPopover.style.left = `${left}px`;
+        wordPopover.style.top = `${top}px`;
+        wordPopover.classList.remove("hidden");
+        wordPopover.classList.add("visible");
+      }
+
+      function hideWordPopover() {
+        wordPopover.classList.remove("visible");
+        wordPopover.classList.add("hidden");
+      }
+
+      async function handleWordClick(target) {
+        const word = sanitizeWord(target.dataset.word || "");
+        if (!word) return;
+
+        currentWord = null;
+        wordTitle.textContent = word;
+        wordPhonetic.textContent = "加载中...";
+        wordCn.textContent = "正在查询中文释义...";
+        wordEn.textContent = "Loading definition...";
+        updateSaveWordButton(word);
+        showWordPopover(target);
+
+        const data = await fetchWordDefinition(word);
+        currentWord = {
+          word,
+          phonetic: data.phonetic,
+          en: data.en,
+          cn: data.cn
+        };
+
+        wordTitle.textContent = word;
+        wordPhonetic.textContent = data.phonetic;
+        wordCn.textContent = data.cn;
+        wordEn.textContent = data.en;
+        updateSaveWordButton(word);
+      }
+
+      function saveCurrentWord() {
+        if (!currentWord) return;
+
+        const vocab = getVocabulary();
+        const exists = vocab.some((item) => String(item.word || "").toLowerCase() === currentWord.word.toLowerCase());
+        if (exists) {
+          updateSaveWordButton(currentWord.word);
+          return;
+        }
+
+        vocab.unshift({
+          word: currentWord.word,
+          phonetic: currentWord.phonetic,
+          en: currentWord.en,
+          cn: currentWord.cn,
+          savedAt: new Date().toISOString(),
+          reviewCount: 0,
+          lastReview: null
+        });
+
+        setVocabulary(vocab);
+        updateSaveWordButton(currentWord.word);
+        setStatus(`已收藏单词：${currentWord.word}`);
+      }
+
+      function loadPreset() {
+        const key = presetSelect.value;
+        const text = PRESETS[key] || "";
+        articleInput.value = text;
+
+        currentArticle = null;
+        applyLoadedArticleMeta();
+        renderArticleFromText(text);
+      }
+
+      function renderFromEditor() {
+        const text = articleInput.value.trim();
+        if (!text) {
+          setStatus("请输入英文文章内容。");
+          return;
+        }
+
+        if (currentArticle) {
+          currentArticle.text = text;
+          currentArticle.translations = {};
+          currentArticle.status = "in_progress";
+          currentArticle.progress = 0;
+          currentArticle.lastSentenceIndex = 0;
+          saveCurrentArticle();
+          applyLoadedArticleMeta();
+        }
+
+        renderArticleFromText(text);
+      }
+
+      function loadArticleFromUrl() {
+        const params = new URLSearchParams(window.location.search);
+        const articleId = params.get("article");
+
+        if (articleId) {
+          const raw = localStorage.getItem(articleId);
+          if (raw) {
+            try {
+              currentArticle = normalizeArticle(JSON.parse(raw), articleId);
+              articleInput.value = currentArticle.text;
+              applyLoadedArticleMeta();
+              renderArticleFromText(currentArticle.text);
+              setStatus(`已加载文章：${currentArticle.title}`);
+              return true;
+            } catch (_error) {
+              setStatus("文章数据损坏，已回退到预设模式。");
+            }
+          }
+        }
+
+        if (params.get("source") === "import") {
+          const latest = getLatestArticle();
+          if (latest) {
+            currentArticle = latest;
+            articleInput.value = currentArticle.text;
+            applyLoadedArticleMeta();
+            renderArticleFromText(currentArticle.text);
+            setStatus(`已加载最近导入文章：${currentArticle.title}`);
+            return true;
+          }
+        }
+
+        return false;
+      }
+
+      function setupListeners() {
+        themeToggle.addEventListener("click", toggleTheme);
+
+        loadPresetBtn.addEventListener("click", loadPreset);
+        renderArticleBtn.addEventListener("click", renderFromEditor);
+        readAllBtn.addEventListener("click", playWholeArticle);
+
+        sentenceModeBtn.addEventListener("click", () => {
+          if (sentenceModeRunning) {
+            stopPlayback();
+          } else {
+            playSentenceMode();
+          }
+        });
+
+        stopBtn.addEventListener("click", () => stopPlayback());
+
+        modeButtons.forEach((btn) => {
+          btn.addEventListener("click", () => {
+            setReadingMode(btn.dataset.mode);
+          });
+        });
+
+        sentencesContainer.addEventListener("click", (event) => {
+          const token = event.target.closest(".word-token");
+          if (token) handleWordClick(token);
+        });
+
+        sentencesContainer.addEventListener("keydown", (event) => {
+          const token = event.target.closest(".word-token");
+          if (!token) return;
+          if (event.key === "Enter" || event.key === " ") {
+            event.preventDefault();
+            handleWordClick(token);
+          }
+        });
+
+        saveWordBtn.addEventListener("click", saveCurrentWord);
+        closeWordBtn.addEventListener("click", hideWordPopover);
+
+        document.addEventListener("click", (event) => {
+          if (wordPopover.classList.contains("hidden")) return;
+          const withinPopover = wordPopover.contains(event.target);
+          const onWord = event.target.closest(".word-token");
+          if (!withinPopover && !onWord) hideWordPopover();
+        });
+
+        document.addEventListener("keydown", (event) => {
+          if (event.key === "Escape") {
+            closeSettingsDrawer();
+            hideWordPopover();
+            if (sentenceModeRunning || !audio.paused) {
+              stopPlayback();
+            }
+          }
+        });
+      }
+
+      function init() {
+        runMigrationV1();
+        applyThemeFromStorage();
+        applyReadingSettings();
+
+        const initialMode = getReadingModeFromStorage();
+        setReadingMode(initialMode);
+
+        setupListeners();
+        setupSettingsDrawer();
+
+        const loaded = loadArticleFromUrl();
+        if (!loaded) {
+          loadPreset();
+          setStatus("就绪。你可以替换文章并开始学习。");
+        }
+      }
+
+      window.addEventListener("beforeunload", () => {
+        audioCache.forEach((url) => URL.revokeObjectURL(url));
+        clearObserver();
+      });
+
+      init();
+    })();
+  </script>
+</body>
+</html>

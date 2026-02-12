@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<!-- [DONE] P1-1: 生词收藏与闪卡复习 - 2026-02-12 -->
+<!-- [DONE] P1-3: 移动端导航 - 2026-02-12 -->
+<!-- [DONE] FIX: 删除单词 + meta - 2026-02-12 -->
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Deep Focus Reader - 生词本与闪卡复习" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📖</text></svg>" />
+  <title>Deep Focus Reader - Vocabulary</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Spectral:ital,wght@0,300;0,400;0,500;0,600;0,700;1,400&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            primary: "#2c2925",
+            "background-light": "#f7f7f7",
+            "background-dark": "#1a1918",
+            "fresh-page": "#FDFBF7"
+          },
+          fontFamily: {
+            display: ["Space Grotesk", "sans-serif"],
+            serif: ["Spectral", "serif"]
+          },
+          borderRadius: {
+            DEFAULT: "1rem",
+            lg: "2rem",
+            xl: "3rem",
+            full: "9999px"
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    .word-item.active {
+      background: rgba(44, 41, 37, 0.08);
+      border-color: rgba(44, 41, 37, 0.2);
+    }
+    .flashcard-face { backface-visibility: hidden; }
+    .flashcard-inner {
+      transform-style: preserve-3d;
+      transition: transform 0.45s ease;
+    }
+    .flashcard-inner.flipped { transform: rotateY(180deg); }
+    .flashcard-back {
+      transform: rotateY(180deg);
+      position: absolute;
+      inset: 0;
+    }
+  </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark font-display text-primary h-screen overflow-hidden">
+  <main class="h-full flex flex-col">
+    <header class="px-4 sm:px-6 py-4 border-b border-primary/10 dark:border-white/10 bg-background-light/80 dark:bg-background-dark/80 backdrop-blur-sm">
+      <div class="max-w-6xl mx-auto flex items-center justify-between gap-3">
+        <div>
+          <h1 class="font-serif text-2xl sm:text-3xl">Vocabulary Notebook</h1>
+          <p class="text-sm text-primary/65 dark:text-white/65">来自阅读页收藏的生词，支持快速复习。</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="themeToggle" class="min-h-[44px] min-w-[44px] h-11 w-11 rounded-full border border-primary/15 dark:border-white/20 hover:scale-105 active:scale-95 transition-all" aria-label="Toggle theme">
+            <span class="material-icons-round">dark_mode</span>
+          </button>
+          <a href="../index.html" class="hidden md:flex min-h-[44px] px-4 rounded-full bg-primary text-white text-sm shadow-lg hover:scale-105 active:scale-95 transition-all items-center">Hub</a>
+        </div>
+      </div>
+    </header>
+
+    <section class="flex-1 overflow-hidden p-4 sm:p-6">
+      <div class="max-w-6xl mx-auto h-full grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-4">
+        <aside class="h-full rounded-3xl border border-primary/10 dark:border-white/10 bg-fresh-page dark:bg-white/5 p-4 flex flex-col">
+          <label for="wordSearch" class="text-xs uppercase tracking-wider text-primary/50 dark:text-white/50 mb-2">Search Words</label>
+          <input id="wordSearch" type="text" class="w-full rounded-xl border-primary/15 dark:border-white/20 bg-white/80 dark:bg-white/5 text-sm mb-3" placeholder="Search vocabulary..." />
+
+          <div id="wordList" class="flex-1 overflow-y-auto no-scrollbar space-y-2 pr-1"></div>
+
+          <div class="pt-3 border-t border-primary/10 dark:border-white/10 mt-3">
+            <button id="startReviewBtn" class="w-full min-h-[44px] rounded-full bg-primary text-white font-medium hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2">
+              <span class="material-icons-round text-base">style</span>
+              <span>开始复习</span>
+            </button>
+            <p id="reviewHint" class="text-xs text-primary/60 dark:text-white/60 mt-2">无生词时请先去阅读页收藏。</p>
+          </div>
+        </aside>
+
+        <article class="h-full rounded-3xl border border-primary/10 dark:border-white/10 bg-fresh-page dark:bg-white/5 p-6 sm:p-8 overflow-y-auto no-scrollbar">
+          <div id="detailEmpty" class="h-full flex items-center justify-center text-center text-primary/60 dark:text-white/60">
+            <div>
+              <p class="text-lg font-serif">暂无生词</p>
+              <p class="text-sm mt-1">去阅读页点击单词后保存到生词本。</p>
+            </div>
+          </div>
+
+          <div id="detailPanel" class="hidden space-y-6">
+            <div class="flex items-start justify-between gap-4">
+              <div>
+                <h2 id="detailWord" class="font-serif text-5xl leading-none tracking-tight">word</h2>
+                <p id="detailPhonetic" class="text-lg text-primary/60 dark:text-white/70 mt-2">/phonetic/</p>
+              </div>
+              <button id="speakWordBtn" class="min-h-[44px] min-w-[44px] h-11 w-11 rounded-full border border-primary/15 dark:border-white/20 hover:bg-primary hover:text-white transition-all" aria-label="Pronounce word">
+                <span class="material-icons-round">volume_up</span>
+              </button>
+            </div>
+
+            <div class="space-y-4">
+              <div>
+                <p class="text-xs uppercase tracking-wider text-primary/50 dark:text-white/50 mb-2">English Definition</p>
+                <p id="detailEn" class="text-lg leading-relaxed text-primary/85 dark:text-white/85"></p>
+              </div>
+              <div>
+                <p class="text-xs uppercase tracking-wider text-primary/50 dark:text-white/50 mb-2">中文释义</p>
+                <p id="detailCn" class="text-lg leading-relaxed text-primary/75 dark:text-white/75"></p>
+              </div>
+            </div>
+
+            <div class="rounded-2xl bg-primary/5 dark:bg-white/5 border border-primary/10 dark:border-white/10 p-4 space-y-2 text-sm text-primary/70 dark:text-white/70">
+              <p><span class="font-semibold">Saved:</span> <span id="detailSavedAt"></span></p>
+              <p><span class="font-semibold">Review Count:</span> <span id="detailReviewCount"></span></p>
+              <p><span class="font-semibold">Last Review:</span> <span id="detailLastReview"></span></p>
+            </div>
+            <button id="deleteWordBtn" class="w-full min-h-[44px] py-2 rounded-xl border border-red-200 dark:border-red-800 text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 text-sm transition-all flex items-center justify-center gap-1.5">
+              <span class="material-icons-round text-base">delete</span>
+              <span>删除此单词</span>
+            </button>
+          </div>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <div id="reviewModal" class="fixed inset-0 z-50 hidden bg-primary/35 backdrop-blur-sm p-4 sm:p-6">
+    <div class="max-w-2xl mx-auto h-full flex flex-col justify-center">
+      <div class="rounded-3xl bg-fresh-page dark:bg-[#23211e] border border-primary/10 dark:border-white/10 p-5 sm:p-6 shadow-2xl">
+        <div class="flex items-center justify-between mb-4">
+          <h3 class="font-serif text-2xl">Flashcard Review</h3>
+          <button id="closeReviewBtn" class="min-h-[44px] min-w-[44px] h-11 w-11 rounded-full hover:bg-primary/5 dark:hover:bg-white/10 transition-all" aria-label="Close review">
+            <span class="material-icons-round">close</span>
+          </button>
+        </div>
+
+        <p id="reviewProgress" class="text-xs uppercase tracking-wider text-primary/55 dark:text-white/60 mb-3">0 / 0</p>
+
+        <button id="flipCardBtn" class="block w-full mb-4" type="button">
+          <div class="relative min-h-[280px] sm:min-h-[320px] w-full rounded-2xl border border-primary/10 dark:border-white/10 overflow-hidden">
+            <div id="flashcardInner" class="flashcard-inner relative h-full">
+              <div class="flashcard-face absolute inset-0 flex flex-col items-center justify-center gap-2 bg-white/70 dark:bg-white/5 px-6">
+                <p class="text-xs uppercase tracking-wider text-primary/55 dark:text-white/60">Front</p>
+                <h4 id="flashWord" class="font-serif text-5xl sm:text-6xl text-center leading-none">Word</h4>
+                <p id="flashPhonetic" class="text-base text-primary/65 dark:text-white/65">/phonetic/</p>
+              </div>
+              <div class="flashcard-face flashcard-back flex flex-col justify-center bg-white/70 dark:bg-white/5 px-6 py-6 text-left">
+                <p class="text-xs uppercase tracking-wider text-primary/55 dark:text-white/60 mb-2">Back</p>
+                <p id="flashEn" class="text-base leading-relaxed text-primary/80 dark:text-white/80 mb-3"></p>
+                <p id="flashCn" class="text-base leading-relaxed text-primary/75 dark:text-white/75"></p>
+              </div>
+            </div>
+          </div>
+        </button>
+
+        <div class="grid grid-cols-2 gap-3">
+          <button id="notKnownBtn" class="min-h-[44px] rounded-xl border border-primary/15 dark:border-white/20 hover:bg-primary/5 dark:hover:bg-white/10 transition-all">不认识</button>
+          <button id="knownBtn" class="min-h-[44px] rounded-xl bg-primary text-white hover:scale-105 active:scale-95 transition-all">认识</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <nav class="fixed bottom-0 left-0 right-0 md:hidden bg-white/90 dark:bg-[#23211e]/90 backdrop-blur border-t border-primary/10 dark:border-white/10 flex justify-around py-2 z-50">
+    <a href="../library_dashboard/code.html" class="min-h-[44px] min-w-[44px] flex items-center justify-center text-primary/60"><span class="material-icons-round">library_books</span></a>
+    <a href="../the_study_reading_view/code.html" class="min-h-[44px] min-w-[44px] flex items-center justify-center text-primary/60"><span class="material-icons-round">auto_stories</span></a>
+    <a href="./code.html" class="min-h-[44px] min-w-[44px] flex items-center justify-center text-primary"><span class="material-icons-round">school</span></a>
+    <a href="../ingest_and_analysis_modal/code.html" class="min-h-[44px] min-w-[44px] flex items-center justify-center text-primary/60"><span class="material-icons-round">upload_file</span></a>
+  </nav>
+
+  <script>
+    (function () {
+      const KEYS = {
+        vocabulary: "vocabulary",
+        theme: "dfr_theme"
+      };
+
+      const wordSearch = document.getElementById("wordSearch");
+      const wordList = document.getElementById("wordList");
+      const detailEmpty = document.getElementById("detailEmpty");
+      const detailPanel = document.getElementById("detailPanel");
+      const detailWord = document.getElementById("detailWord");
+      const detailPhonetic = document.getElementById("detailPhonetic");
+      const detailEn = document.getElementById("detailEn");
+      const detailCn = document.getElementById("detailCn");
+      const detailSavedAt = document.getElementById("detailSavedAt");
+      const detailReviewCount = document.getElementById("detailReviewCount");
+      const detailLastReview = document.getElementById("detailLastReview");
+      const speakWordBtn = document.getElementById("speakWordBtn");
+      const deleteWordBtn = document.getElementById("deleteWordBtn");
+      const startReviewBtn = document.getElementById("startReviewBtn");
+      const reviewHint = document.getElementById("reviewHint");
+      const themeToggle = document.getElementById("themeToggle");
+
+      const reviewModal = document.getElementById("reviewModal");
+      const closeReviewBtn = document.getElementById("closeReviewBtn");
+      const reviewProgress = document.getElementById("reviewProgress");
+      const flipCardBtn = document.getElementById("flipCardBtn");
+      const flashcardInner = document.getElementById("flashcardInner");
+      const flashWord = document.getElementById("flashWord");
+      const flashPhonetic = document.getElementById("flashPhonetic");
+      const flashEn = document.getElementById("flashEn");
+      const flashCn = document.getElementById("flashCn");
+      const knownBtn = document.getElementById("knownBtn");
+      const notKnownBtn = document.getElementById("notKnownBtn");
+
+      let vocabulary = [];
+      let filtered = [];
+      let selectedWord = null;
+
+      let reviewQueue = [];
+      let reviewTotal = 0;
+      let retryMap = {};
+      let reviewFlipped = false;
+
+      function loadVocabulary() {
+        const raw = localStorage.getItem(KEYS.vocabulary);
+        if (!raw) return [];
+        try {
+          const parsed = JSON.parse(raw);
+          if (!Array.isArray(parsed)) return [];
+          return parsed;
+        } catch (_error) {
+          return [];
+        }
+      }
+
+      function saveVocabulary(next) {
+        vocabulary = next;
+        localStorage.setItem(KEYS.vocabulary, JSON.stringify(next));
+      }
+
+      function applyThemeFromStorage() {
+        const t = localStorage.getItem(KEYS.theme);
+        if (t === "dark") {
+          document.documentElement.classList.add("dark");
+        } else {
+          document.documentElement.classList.remove("dark");
+        }
+      }
+
+      function toggleTheme() {
+        const isDark = document.documentElement.classList.toggle("dark");
+        localStorage.setItem(KEYS.theme, isDark ? "dark" : "light");
+      }
+
+      function formatDate(iso) {
+        if (!iso) return "-";
+        const d = new Date(iso);
+        if (Number.isNaN(d.getTime())) return "-";
+        return d.toLocaleString("zh-CN", { year: "numeric", month: "short", day: "numeric" });
+      }
+
+      function renderWordDetail(item) {
+        if (!item) {
+          detailEmpty.classList.remove("hidden");
+          detailPanel.classList.add("hidden");
+          selectedWord = null;
+          return;
+        }
+
+        selectedWord = item;
+        detailEmpty.classList.add("hidden");
+        detailPanel.classList.remove("hidden");
+
+        detailWord.textContent = item.word || "";
+        detailPhonetic.textContent = item.phonetic || "N/A";
+        detailEn.textContent = item.en || "No definition.";
+        detailCn.textContent = item.cn || "暂无中文释义";
+        detailSavedAt.textContent = formatDate(item.savedAt);
+        detailReviewCount.textContent = String(item.reviewCount || 0);
+        detailLastReview.textContent = item.lastReview ? formatDate(item.lastReview) : "-";
+      }
+
+      function renderWordList() {
+        if (!filtered.length) {
+          wordList.innerHTML = '<div class="rounded-xl border border-primary/10 dark:border-white/10 p-3 text-sm text-primary/60 dark:text-white/60">暂无匹配词条</div>';
+          renderWordDetail(null);
+          return;
+        }
+
+        wordList.innerHTML = filtered.map((item) => {
+          const active = selectedWord && selectedWord.word?.toLowerCase() === item.word?.toLowerCase();
+          return `
+            <button class="word-item w-full text-left rounded-xl border border-primary/10 dark:border-white/10 px-3 py-3 hover:bg-primary/5 dark:hover:bg-white/10 transition-all ${active ? "active" : ""}" data-word="${item.word}">
+              <div class="flex items-center justify-between gap-2">
+                <span class="font-semibold text-sm">${item.word}</span>
+                <span class="text-[11px] text-primary/55 dark:text-white/55">${item.reviewCount || 0} review</span>
+              </div>
+              <p class="text-xs text-primary/60 dark:text-white/60 mt-1 truncate">${item.cn || "暂无释义"}</p>
+            </button>
+          `;
+        }).join("");
+      }
+
+      function applySearch() {
+        const term = wordSearch.value.trim().toLowerCase();
+        filtered = vocabulary.filter((item) => {
+          if (!term) return true;
+          const haystack = `${item.word || ""} ${item.en || ""} ${item.cn || ""}`.toLowerCase();
+          return haystack.includes(term);
+        });
+
+        if (selectedWord) {
+          const next = filtered.find((item) => item.word?.toLowerCase() === selectedWord.word?.toLowerCase());
+          if (next) selectedWord = next;
+        }
+
+        renderWordList();
+        if (!selectedWord && filtered[0]) {
+          renderWordDetail(filtered[0]);
+          renderWordList();
+        }
+      }
+
+      function openReview() {
+        if (!vocabulary.length) return;
+
+        reviewQueue = vocabulary.map((item) => item.word.toLowerCase());
+        reviewTotal = reviewQueue.length;
+        retryMap = {};
+        reviewFlipped = false;
+        reviewModal.classList.remove("hidden");
+        renderReviewCard();
+      }
+
+      function closeReview() {
+        reviewModal.classList.add("hidden");
+      }
+
+      function getWordByKey(key) {
+        return vocabulary.find((item) => item.word?.toLowerCase() === key) || null;
+      }
+
+      function renderReviewCard() {
+        if (!reviewQueue.length) {
+          reviewProgress.textContent = `完成 ${reviewTotal} / ${reviewTotal}`;
+          flashWord.textContent = "Done";
+          flashPhonetic.textContent = "复习完成";
+          flashEn.textContent = "Great work. All cards reviewed.";
+          flashCn.textContent = "本轮复习完成。";
+          knownBtn.disabled = true;
+          notKnownBtn.disabled = true;
+          return;
+        }
+
+        const currentKey = reviewQueue[0];
+        const current = getWordByKey(currentKey);
+        if (!current) {
+          reviewQueue.shift();
+          renderReviewCard();
+          return;
+        }
+
+        const doneCount = reviewTotal - reviewQueue.length;
+        reviewProgress.textContent = `${doneCount + 1} / ${reviewTotal}`;
+        flashWord.textContent = current.word;
+        flashPhonetic.textContent = current.phonetic || "N/A";
+        flashEn.textContent = current.en || "No definition.";
+        flashCn.textContent = current.cn || "暂无中文释义";
+
+        reviewFlipped = false;
+        flashcardInner.classList.remove("flipped");
+        knownBtn.disabled = false;
+        notKnownBtn.disabled = false;
+      }
+
+      function markReview(known) {
+        if (!reviewQueue.length) return;
+
+        const currentKey = reviewQueue.shift();
+        const index = vocabulary.findIndex((item) => item.word?.toLowerCase() === currentKey);
+        if (index >= 0) {
+          vocabulary[index].reviewCount = Number(vocabulary[index].reviewCount || 0) + 1;
+          vocabulary[index].lastReview = new Date().toISOString();
+        }
+
+        if (!known) {
+          const retry = Number(retryMap[currentKey] || 0);
+          if (retry < 1) {
+            retryMap[currentKey] = retry + 1;
+            reviewQueue.push(currentKey);
+          }
+        }
+
+        saveVocabulary(vocabulary);
+        applySearch();
+        renderReviewCard();
+      }
+
+      function speakSelectedWord() {
+        if (!selectedWord?.word) return;
+        if (!("speechSynthesis" in window)) return;
+        const utterance = new SpeechSynthesisUtterance(selectedWord.word);
+        utterance.lang = "en-US";
+        utterance.rate = 0.95;
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(utterance);
+      }
+
+      function deleteSelectedWord() {
+        if (!selectedWord) return;
+        if (!window.confirm(`确定要删除单词 "${selectedWord.word}" 吗？`)) return;
+        const next = vocabulary.filter((item) => item.word?.toLowerCase() !== selectedWord.word?.toLowerCase());
+        saveVocabulary(next);
+        selectedWord = null;
+        filtered = [...vocabulary];
+        renderWordDetail(vocabulary[0] || null);
+        renderWordList();
+        reviewHint.textContent = vocabulary.length ? `当前生词：${vocabulary.length} 个` : "暂无生词，去阅读页点击单词收藏。";
+      }
+
+      function setupEvents() {
+        themeToggle.addEventListener("click", toggleTheme);
+        wordSearch.addEventListener("input", applySearch);
+
+        wordList.addEventListener("click", (event) => {
+          const row = event.target.closest(".word-item");
+          if (!row) return;
+          const word = row.dataset.word;
+          const item = filtered.find((w) => w.word === word);
+          if (item) {
+            renderWordDetail(item);
+            renderWordList();
+          }
+        });
+
+        speakWordBtn.addEventListener("click", speakSelectedWord);
+        deleteWordBtn.addEventListener("click", deleteSelectedWord);
+        startReviewBtn.addEventListener("click", openReview);
+        closeReviewBtn.addEventListener("click", closeReview);
+
+        flipCardBtn.addEventListener("click", () => {
+          reviewFlipped = !reviewFlipped;
+          flashcardInner.classList.toggle("flipped", reviewFlipped);
+        });
+
+        knownBtn.addEventListener("click", () => markReview(true));
+        notKnownBtn.addEventListener("click", () => markReview(false));
+
+        document.addEventListener("keydown", (event) => {
+          if (event.key === "Escape" && !reviewModal.classList.contains("hidden")) {
+            closeReview();
+          }
+          if (event.key === " " && !reviewModal.classList.contains("hidden")) {
+            event.preventDefault();
+            reviewFlipped = !reviewFlipped;
+            flashcardInner.classList.toggle("flipped", reviewFlipped);
+          }
+        });
+      }
+
+      function init() {
+        applyThemeFromStorage();
+        vocabulary = loadVocabulary().sort((a, b) => new Date(b.savedAt || 0).getTime() - new Date(a.savedAt || 0).getTime());
+        filtered = [...vocabulary];
+
+        if (vocabulary.length) {
+          renderWordDetail(vocabulary[0]);
+          renderWordList();
+          reviewHint.textContent = `当前生词：${vocabulary.length} 个`;
+        } else {
+          renderWordDetail(null);
+          renderWordList();
+          reviewHint.textContent = "暂无生词，去阅读页点击单词收藏。";
+        }
+
+        setupEvents();
+      }
+
+      init();
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<!-- [DONE] P0-3: 图书馆动态化与检索筛选 - 2026-02-12 -->
+<!-- [DONE] P1-3: 移动端导航 - 2026-02-12 -->
+<!-- [DONE] FIX: 删除/归档文章 + meta - 2026-02-12 -->
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Deep Focus Reader - 我的英语学习图书馆" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📖</text></svg>" />
+  <title>Deep Focus Reader - Library</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700&family=Spectral:wght@400;600;700&family=Crimson+Pro:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            primary: "#2c2925",
+            "background-light": "#F2F0E9",
+            "background-dark": "#1a1918",
+            "paper-card": "#FDFBF7",
+            "paper-accent": "#e6e2d6"
+          },
+          fontFamily: {
+            display: ["Space Grotesk", "sans-serif"],
+            "serif-title": ["Spectral", "serif"],
+            "serif-text": ["Crimson Pro", "serif"]
+          },
+          borderRadius: {
+            DEFAULT: "1rem",
+            lg: "2rem",
+            xl: "3rem",
+            full: "9999px"
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    .masonry-grid { column-count: 1; column-gap: 1.25rem; }
+    @media (min-width: 768px) { .masonry-grid { column-count: 2; } }
+    @media (min-width: 1280px) { .masonry-grid { column-count: 3; } }
+    .masonry-item { break-inside: avoid; margin-bottom: 1.25rem; }
+  </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-primary font-display min-h-screen antialiased transition-colors duration-300">
+  <nav class="fixed top-0 w-full z-50 bg-background-light/90 dark:bg-background-dark/90 backdrop-blur-sm border-b border-primary/10 dark:border-white/10 px-4 sm:px-6 py-3 sm:py-4 flex items-center justify-between gap-3">
+    <div class="flex items-center gap-3">
+      <a href="../index.html" class="w-10 h-10 rounded-xl bg-primary text-white flex items-center justify-center font-bold">D</a>
+      <div class="hidden sm:block">
+        <p class="text-xs uppercase tracking-wider text-primary/60 dark:text-white/60">Deep Focus</p>
+        <h1 class="font-serif-title text-lg">My Library</h1>
+      </div>
+    </div>
+
+    <div class="hidden md:flex flex-1 max-w-lg relative group">
+      <span class="material-icons-round absolute left-4 top-1/2 -translate-y-1/2 text-primary/40">search</span>
+      <input id="searchInput" type="text" class="w-full bg-paper-card dark:bg-white/5 rounded-full py-3 pl-12 pr-4 text-sm border-0 focus:ring-1 focus:ring-primary/20" placeholder="Search by title or content..." />
+    </div>
+
+    <div class="flex items-center gap-2">
+      <button id="themeToggle" class="min-h-[44px] min-w-[44px] h-11 w-11 rounded-full border border-primary/15 dark:border-white/20 hover:scale-105 active:scale-95 transition-all" aria-label="Toggle theme">
+        <span class="material-icons-round">dark_mode</span>
+      </button>
+      <a href="../ingest_and_analysis_modal/code.html" class="min-h-[44px] px-4 sm:px-6 rounded-full bg-primary text-[#F2F0E9] text-sm font-medium transition-all shadow-md hover:shadow-lg active:scale-95 inline-flex items-center gap-2">
+        <span class="material-icons-round text-sm">add</span>
+        <span class="hidden sm:inline">New Text</span>
+      </a>
+    </div>
+  </nav>
+
+  <main class="pt-24 sm:pt-28 pb-24 md:pb-12 px-4 sm:px-6 max-w-[1600px] mx-auto">
+    <header class="mb-7 flex flex-col md:flex-row md:items-end justify-between gap-4">
+      <div>
+        <h2 class="font-serif-title font-bold text-3xl sm:text-4xl text-primary dark:text-white mb-2">My Library</h2>
+        <p class="text-primary/60 dark:text-white/60 font-serif-text italic text-lg">"To read is to voyage through time."</p>
+      </div>
+
+      <div class="flex flex-wrap gap-2" id="filterGroup">
+        <button class="filter-btn px-4 py-2 rounded-full bg-primary text-[#F2F0E9] text-sm font-medium" data-filter="all">All</button>
+        <button class="filter-btn px-4 py-2 rounded-full bg-primary/5 hover:bg-primary/10 text-sm font-medium transition-colors" data-filter="in_progress">In Progress</button>
+        <button class="filter-btn px-4 py-2 rounded-full bg-primary/5 hover:bg-primary/10 text-sm font-medium transition-colors" data-filter="completed">Completed</button>
+        <button class="filter-btn px-4 py-2 rounded-full bg-primary/5 hover:bg-primary/10 text-sm font-medium transition-colors" data-filter="archived">Archived</button>
+      </div>
+
+      <div class="md:hidden">
+        <input id="searchInputMobile" type="text" class="w-full bg-paper-card dark:bg-white/5 rounded-full py-3 px-4 text-sm border-0 focus:ring-1 focus:ring-primary/20" placeholder="Search..." />
+      </div>
+    </header>
+
+    <section id="emptyState" class="hidden rounded-3xl border border-primary/10 dark:border-white/10 bg-white/75 dark:bg-white/5 p-8 text-center">
+      <h3 class="font-serif-title text-2xl mb-2">还没有导入任何文章</h3>
+      <p class="text-primary/70 dark:text-white/70 mb-4">点击上方按钮开始导入。</p>
+      <a href="../ingest_and_analysis_modal/code.html" class="inline-flex min-h-[44px] items-center gap-2 px-5 rounded-full bg-primary text-white text-sm">
+        <span class="material-icons-round text-sm">upload_file</span>
+        <span>开始导入</span>
+      </a>
+    </section>
+
+    <section id="libraryGrid" class="masonry-grid"></section>
+  </main>
+
+  <a href="../index.html" class="fixed bottom-20 right-4 md:bottom-5 md:right-5 z-40 min-h-[44px] px-4 rounded-full bg-primary text-white text-sm shadow-lg hover:scale-105 active:scale-95 transition-all flex items-center">Hub</a>
+
+  <nav class="fixed bottom-0 left-0 right-0 md:hidden bg-white/90 dark:bg-[#23211e]/90 backdrop-blur border-t border-primary/10 dark:border-white/10 flex justify-around py-2 z-50">
+    <a href="./code.html" class="min-h-[44px] min-w-[44px] flex items-center justify-center text-primary"><span class="material-icons-round">library_books</span></a>
+    <a href="../the_study_reading_view/code.html" class="min-h-[44px] min-w-[44px] flex items-center justify-center text-primary/60"><span class="material-icons-round">auto_stories</span></a>
+    <a href="../vocabulary_insights_sidebar/code.html" class="min-h-[44px] min-w-[44px] flex items-center justify-center text-primary/60"><span class="material-icons-round">school</span></a>
+    <a href="../ingest_and_analysis_modal/code.html" class="min-h-[44px] min-w-[44px] flex items-center justify-center text-primary/60"><span class="material-icons-round">upload_file</span></a>
+  </nav>
+
+  <script>
+    (function () {
+      const KEYS = {
+        migrationDone: "dfr_migration_v1_done",
+        theme: "dfr_theme"
+      };
+
+      const searchInput = document.getElementById("searchInput");
+      const searchInputMobile = document.getElementById("searchInputMobile");
+      const grid = document.getElementById("libraryGrid");
+      const emptyState = document.getElementById("emptyState");
+      const filterButtons = Array.from(document.querySelectorAll(".filter-btn"));
+      const themeToggle = document.getElementById("themeToggle");
+
+      let allArticles = [];
+      let activeFilter = "all";
+      let searchTerm = "";
+
+      function runMigrationV1() {
+        if (localStorage.getItem(KEYS.migrationDone) === "true") return;
+
+        const legacyRaw = localStorage.getItem("dfr_last_imported");
+        if (legacyRaw) {
+          try {
+            const legacy = JSON.parse(legacyRaw);
+            const text = String(legacy.text || legacy.content || "").trim();
+            if (text) {
+              const article = {
+                id: `article_${Date.now()}`,
+                title: String(legacy.title || "Imported Text"),
+                text,
+                translations: legacy.translations && typeof legacy.translations === "object" ? legacy.translations : {},
+                createdAt: legacy.createdAt || new Date().toISOString(),
+                progress: Number(legacy.progress || 0),
+                status: legacy.status || "in_progress",
+                lastSentenceIndex: Number(legacy.lastSentenceIndex || 0),
+                updatedAt: new Date().toISOString()
+              };
+              localStorage.setItem(article.id, JSON.stringify(article));
+            }
+          } catch (_error) {
+            // ignore
+          }
+        }
+
+        localStorage.setItem(KEYS.migrationDone, "true");
+      }
+
+      function applyThemeFromStorage() {
+        const t = localStorage.getItem(KEYS.theme);
+        if (t === "dark") {
+          document.documentElement.classList.add("dark");
+        } else {
+          document.documentElement.classList.remove("dark");
+        }
+      }
+
+      function toggleTheme() {
+        const isDark = document.documentElement.classList.toggle("dark");
+        localStorage.setItem(KEYS.theme, isDark ? "dark" : "light");
+      }
+
+      function normalizeArticle(raw, keyHint) {
+        const text = String(raw.text || raw.content || "").trim();
+        return {
+          id: String(raw.id || keyHint),
+          title: String(raw.title || "Untitled Article"),
+          text,
+          progress: Math.max(0, Math.min(100, Number(raw.progress || 0))),
+          status: String(raw.status || "in_progress"),
+          createdAt: raw.createdAt || new Date().toISOString(),
+          updatedAt: raw.updatedAt || raw.createdAt || new Date().toISOString()
+        };
+      }
+
+      function formatDate(iso) {
+        const d = new Date(iso);
+        if (Number.isNaN(d.getTime())) return "Unknown";
+        return d.toLocaleDateString("zh-CN", { year: "numeric", month: "short", day: "numeric" });
+      }
+
+      function statusLabel(status) {
+        if (status === "completed") {
+          return { text: "已完成", classes: "bg-green-100 text-green-700" };
+        }
+        if (status === "archived") {
+          return { text: "已归档", classes: "bg-slate-100 text-slate-600" };
+        }
+        return { text: "进行中", classes: "bg-accent/10 text-accent" };
+      }
+
+      function getAllArticles() {
+        const list = [];
+        for (let i = 0; i < localStorage.length; i += 1) {
+          const key = localStorage.key(i);
+          if (!key || !key.startsWith("article_")) continue;
+
+          try {
+            const raw = JSON.parse(localStorage.getItem(key));
+            const normalized = normalizeArticle(raw, key);
+            if (normalized.text) list.push(normalized);
+          } catch (_error) {
+            // ignore invalid record
+          }
+        }
+
+        return list.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      }
+
+      function renderCards(items) {
+        if (!items.length) {
+          grid.innerHTML = "";
+          emptyState.classList.remove("hidden");
+          return;
+        }
+
+        emptyState.classList.add("hidden");
+
+        grid.innerHTML = items.map((item) => {
+          const preview = item.text.length > 100 ? `${item.text.slice(0, 100)}...` : item.text;
+          const label = statusLabel(item.status);
+          const archiveLabel = item.status === "archived" ? "取消归档" : "归档";
+          const archiveIcon = item.status === "archived" ? "unarchive" : "archive";
+          return `
+            <article class="masonry-item group/card relative">
+              <a href="../the_study_reading_view/code.html?article=${encodeURIComponent(item.id)}" class="block bg-paper-card dark:bg-[#252321] rounded-2xl p-6 shadow-[0_2px_8px_rgba(44,41,37,0.04)] border border-primary/10 dark:border-white/10 hover:-translate-y-1 hover:shadow-lg transition-all duration-300">
+                <div class="flex items-start justify-between gap-3 mb-4">
+                  <span class="px-3 py-1 rounded-full text-[11px] font-bold tracking-wide ${label.classes}">${label.text}</span>
+                  <span class="text-xs text-primary/50 dark:text-white/50">${formatDate(item.createdAt)}</span>
+                </div>
+                <h3 class="font-serif-title text-2xl leading-tight text-primary dark:text-white mb-3">${item.title}</h3>
+                <p class="font-serif-text text-base text-primary/75 dark:text-white/70 mb-5 leading-relaxed">${preview}</p>
+                <div>
+                  <div class="flex justify-between text-xs uppercase tracking-wide text-primary/60 dark:text-white/60 mb-2">
+                    <span>Progress</span>
+                    <span>${Math.round(item.progress)}%</span>
+                  </div>
+                  <div class="w-full h-2 bg-primary/10 dark:bg-white/10 rounded-full overflow-hidden">
+                    <div class="h-2 bg-primary rounded-full" style="width:${Math.round(item.progress)}%"></div>
+                  </div>
+                </div>
+              </a>
+              <div class="absolute top-2 right-2 opacity-0 group-hover/card:opacity-100 transition-opacity flex gap-1 z-10">
+                <button class="action-archive min-h-[36px] min-w-[36px] h-9 w-9 rounded-full bg-white dark:bg-[#252321] border border-primary/15 dark:border-white/15 shadow-md flex items-center justify-center text-primary/60 dark:text-white/60 hover:text-primary dark:hover:text-white transition-all hover:scale-110" data-id="${item.id}" data-status="${item.status}" title="${archiveLabel}">
+                  <span class="material-icons-round text-base">${archiveIcon}</span>
+                </button>
+                <button class="action-delete min-h-[36px] min-w-[36px] h-9 w-9 rounded-full bg-white dark:bg-[#252321] border border-red-200 dark:border-red-800 shadow-md flex items-center justify-center text-red-500 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-900/20 transition-all hover:scale-110" data-id="${item.id}" title="删除">
+                  <span class="material-icons-round text-base">delete</span>
+                </button>
+              </div>
+            </article>
+          `;
+        }).join("");
+      }
+
+      function applyFilterAndSearch() {
+        const term = searchTerm.trim().toLowerCase();
+
+        const filtered = allArticles.filter((article) => {
+          const passFilter = activeFilter === "all" ? true : article.status === activeFilter;
+          if (!passFilter) return false;
+
+          if (!term) return true;
+          const haystack = `${article.title} ${article.text}`.toLowerCase();
+          return haystack.includes(term);
+        });
+
+        renderCards(filtered);
+      }
+
+      function setFilter(filter) {
+        activeFilter = filter;
+        filterButtons.forEach((btn) => {
+          const active = btn.dataset.filter === filter;
+          btn.className = active
+            ? "filter-btn px-4 py-2 rounded-full bg-primary text-[#F2F0E9] text-sm font-medium"
+            : "filter-btn px-4 py-2 rounded-full bg-primary/5 hover:bg-primary/10 text-sm font-medium transition-colors";
+        });
+        applyFilterAndSearch();
+      }
+
+      function debounce(fn, wait = 250) {
+        let timer = null;
+        return (...args) => {
+          window.clearTimeout(timer);
+          timer = window.setTimeout(() => fn(...args), wait);
+        };
+      }
+
+      const onSearch = debounce((value) => {
+        searchTerm = value;
+        applyFilterAndSearch();
+      }, 250);
+
+      function archiveArticle(id, currentStatus) {
+        try {
+          const raw = localStorage.getItem(id);
+          if (!raw) return;
+          const article = JSON.parse(raw);
+          article.status = currentStatus === "archived" ? "in_progress" : "archived";
+          article.updatedAt = new Date().toISOString();
+          localStorage.setItem(id, JSON.stringify(article));
+          allArticles = getAllArticles();
+          applyFilterAndSearch();
+        } catch (_error) {}
+      }
+
+      function deleteArticle(id) {
+        if (!window.confirm("确定要删除这篇文章吗？删除后无法恢复。")) return;
+        localStorage.removeItem(id);
+        allArticles = getAllArticles();
+        applyFilterAndSearch();
+      }
+
+      function setupEvents() {
+        themeToggle.addEventListener("click", toggleTheme);
+
+        filterButtons.forEach((btn) => {
+          btn.addEventListener("click", () => setFilter(btn.dataset.filter));
+        });
+
+        searchInput?.addEventListener("input", (event) => {
+          if (searchInputMobile) searchInputMobile.value = event.target.value;
+          onSearch(event.target.value);
+        });
+
+        searchInputMobile?.addEventListener("input", (event) => {
+          if (searchInput) searchInput.value = event.target.value;
+          onSearch(event.target.value);
+        });
+
+        grid.addEventListener("click", (event) => {
+          const archiveBtn = event.target.closest(".action-archive");
+          if (archiveBtn) {
+            event.preventDefault();
+            event.stopPropagation();
+            archiveArticle(archiveBtn.dataset.id, archiveBtn.dataset.status);
+            return;
+          }
+          const deleteBtn = event.target.closest(".action-delete");
+          if (deleteBtn) {
+            event.preventDefault();
+            event.stopPropagation();
+            deleteArticle(deleteBtn.dataset.id);
+          }
+        });
+      }
+
+      runMigrationV1();
+      applyThemeFromStorage();
+      allArticles = getAllArticles();
+      applyFilterAndSearch();
+      setupEvents();
+    })();
+  </script>
+</body>
+</html>

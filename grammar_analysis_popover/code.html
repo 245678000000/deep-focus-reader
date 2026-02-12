@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<!-- [DONE] FIX: 接入 AI 模型替换 mock 数据 - 2026-02-12 -->
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Deep Focus Reader - AI 语法分析" />
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📖</text></svg>" />
+  <title>Deep Focus Reader - Grammar Analysis</title>
+  <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,600;1,400&family=Noto+Serif+SC:wght@300;400;500&family=Space+Grotesk:wght@300;400;500;600&family=Spectral:wght@400;600;700&display=swap" rel="stylesheet" />
+  <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet" />
+  <script>
+    tailwind.config = {
+      darkMode: "class",
+      theme: {
+        extend: {
+          colors: {
+            primary: "#2c2925",
+            "background-light": "#f9f8f4",
+            "background-dark": "#1a1918",
+            "accent-gold": "#E8DCC5",
+            "accent-sienna": "#C25E00",
+            "accent-sienna-deep": "#88543B",
+            "paper-texture": "#fdfbf7",
+            "text-english": "#3A3530",
+            "text-chinese": "#8C867D"
+          },
+          fontFamily: {
+            display: ["Space Grotesk", "sans-serif"],
+            english: ["Crimson Pro", "serif"],
+            chinese: ["Noto Serif SC", "serif"],
+            "serif-header": ["Spectral", "serif"]
+          },
+          borderRadius: { DEFAULT: "1rem", lg: "2rem", xl: "3rem", full: "9999px" },
+          backgroundImage: {
+            "paper-grain": "url('data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.65%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22 opacity=%220.04%22/%3E%3C/svg%3E')"
+          }
+        }
+      }
+    };
+  </script>
+  <style>
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    .sentence-button { box-shadow: 0 2px 8px rgba(44,41,37,0.04); }
+    .sentence-button:focus-visible { outline: 2px solid #c25e00; outline-offset: 2px; }
+    #grammarBackdrop { transition: opacity 0.3s ease; }
+    #grammarPanel { transition: transform 0.3s ease, opacity 0.3s ease; box-shadow: 0 24px 48px rgba(44,41,37,0.15); }
+    #grammarPanel.panel-desktop { width: min(400px, calc(100vw - 1rem)); max-height: 80vh; border-radius: 1rem; transform-origin: top left; }
+    #grammarPanel.panel-mobile { left:0; right:0; bottom:0; width:auto; max-height:82vh; border-radius: 1.5rem 1.5rem 0 0; transform-origin: center bottom; }
+    #grammarPanel.hidden-state.panel-desktop { opacity:0; pointer-events:none; transform: translateY(10px) scale(0.96); }
+    #grammarPanel.visible-state.panel-desktop { opacity:1; pointer-events:auto; transform: translateY(0) scale(1); }
+    #grammarPanel.hidden-state.panel-mobile { opacity:1; pointer-events:none; transform: translateY(100%); }
+    #grammarPanel.visible-state.panel-mobile { opacity:1; pointer-events:auto; transform: translateY(0); }
+    .constituent-pill { border: 1px solid rgba(44,41,37,0.12); }
+    @keyframes pulse-dot { 0%,100%{opacity:0.4} 50%{opacity:1} }
+    .loading-dots span { animation: pulse-dot 1.4s ease-in-out infinite; }
+    .loading-dots span:nth-child(2) { animation-delay: 0.2s; }
+    .loading-dots span:nth-child(3) { animation-delay: 0.4s; }
+  </style>
+</head>
+<body class="bg-background-light dark:bg-background-dark text-primary font-display h-screen overflow-hidden">
+  <div class="h-full flex">
+    <nav class="hidden sm:flex w-16 h-full flex-col items-center py-8 bg-white/50 dark:bg-primary/5 backdrop-blur-sm border-r border-primary/5 shrink-0">
+      <a href="../index.html" class="mb-8 w-10 h-10 bg-primary text-white rounded-xl flex items-center justify-center font-bold text-xl shadow-lg">D</a>
+      <div class="flex-1 flex flex-col gap-5 w-full items-center">
+        <a href="../library_dashboard/code.html" class="w-11 h-11 min-h-[44px] min-w-[44px] flex items-center justify-center text-primary/40 hover:text-primary hover:bg-primary/5 rounded-xl transition-all"><span class="material-icons-round">library_books</span></a>
+        <a href="../the_study_reading_view/code.html" class="w-11 h-11 min-h-[44px] min-w-[44px] flex items-center justify-center text-primary/40 hover:text-primary hover:bg-primary/5 rounded-xl transition-all"><span class="material-icons-round">auto_stories</span></a>
+        <a href="../vocabulary_insights_sidebar/code.html" class="w-11 h-11 min-h-[44px] min-w-[44px] flex items-center justify-center text-primary/40 hover:text-primary hover:bg-primary/5 rounded-xl transition-all"><span class="material-icons-round">school</span></a>
+      </div>
+    </nav>
+
+    <main class="flex-1 h-full overflow-y-auto no-scrollbar bg-paper-grain">
+      <header class="sticky top-0 z-20 px-4 sm:px-8 py-4 bg-background-light/80 dark:bg-background-dark/80 backdrop-blur-md border-b border-primary/5 dark:border-white/10">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <h1 class="font-serif-header text-2xl sm:text-3xl text-primary dark:text-white">Grammar Lens / AI 语法解析</h1>
+            <p class="text-sm text-primary/60 dark:text-white/60">点击任意句子，AI 将分析语法结构、语法点和同义改写</p>
+          </div>
+          <div class="flex items-center gap-2">
+            <select id="articleSelect" class="rounded-xl border-primary/15 dark:border-white/20 bg-white/90 dark:bg-white/5 text-sm min-h-[44px]">
+              <option value="">-- 选择文章 --</option>
+            </select>
+          </div>
+        </div>
+      </header>
+
+      <div class="max-w-[860px] mx-auto px-4 sm:px-8 py-8 pb-28">
+        <div id="emptyState" class="text-center py-16">
+          <span class="material-icons-round text-6xl text-primary/20 dark:text-white/20">menu_book</span>
+          <p class="text-primary/50 dark:text-white/50 mt-4">请先从下拉菜单选择一篇文章，或在输入框中粘贴英文文本。</p>
+          <div class="mt-6 max-w-xl mx-auto">
+            <textarea id="customInput" rows="4" class="w-full rounded-xl border-primary/15 dark:border-white/20 bg-white/90 dark:bg-white/5 text-sm" placeholder="或粘贴英文句子到此处..."></textarea>
+            <button id="analyzeCustomBtn" class="mt-3 min-h-[44px] px-6 rounded-xl bg-primary text-white text-sm hover:scale-105 active:scale-95 transition-all">分析文本</button>
+          </div>
+        </div>
+
+        <article id="sentenceList" class="space-y-5 hidden" aria-label="Sentence list for grammar analysis"></article>
+      </div>
+    </main>
+  </div>
+
+  <div id="grammarBackdrop" class="fixed inset-0 z-40 bg-primary/30 backdrop-blur-sm opacity-0 pointer-events-none"></div>
+
+  <section id="grammarPanel" class="panel-desktop hidden-state fixed z-50 bg-[#FDFBF7] dark:bg-[#23211e] border border-primary/10 dark:border-white/10 overflow-y-auto no-scrollbar" role="dialog" aria-modal="true" aria-labelledby="grammarTitle">
+    <div class="sticky top-0 bg-[#FDFBF7]/95 dark:bg-[#23211e]/95 backdrop-blur-sm border-b border-primary/10 dark:border-white/10 px-4 py-3 flex items-center justify-between">
+      <h3 id="grammarTitle" class="font-serif-header text-xl text-primary dark:text-white">AI Grammar Snapshot</h3>
+      <button id="panelClose" class="min-h-[44px] min-w-[44px] h-11 w-11 rounded-full text-primary/60 dark:text-white/70 hover:text-primary dark:hover:text-white hover:bg-primary/5 dark:hover:bg-white/10 transition-all" aria-label="Close grammar panel">
+        <span class="material-icons-round">close</span>
+      </button>
+    </div>
+    <div class="px-4 py-4 space-y-4">
+      <p id="analysisSentence" class="text-sm leading-relaxed text-primary/80 dark:text-white/80 border-l-2 border-accent-gold pl-3"></p>
+      <div>
+        <h4 class="text-xs uppercase tracking-wider text-primary/60 dark:text-white/60 mb-2">Sentence Constituents / 句子成分</h4>
+        <div id="constituents" class="flex flex-wrap gap-2"></div>
+      </div>
+      <div>
+        <h4 class="text-xs uppercase tracking-wider text-primary/60 dark:text-white/60 mb-2">Grammar Points / 语法点</h4>
+        <div id="grammarPoints" class="flex flex-wrap gap-2"></div>
+      </div>
+      <div>
+        <h4 class="text-xs uppercase tracking-wider text-primary/60 dark:text-white/60 mb-2">Paraphrase Suggestions / 同义改写</h4>
+        <ul id="paraphrases" class="space-y-2"></ul>
+      </div>
+      <div>
+        <h4 class="text-xs uppercase tracking-wider text-primary/60 dark:text-white/60 mb-2">中文讲解</h4>
+        <div id="chineseExplanation" class="text-sm font-chinese text-text-chinese dark:text-white/70 leading-relaxed"></div>
+      </div>
+      <div id="fallback" class="hidden rounded-xl border border-primary/10 dark:border-white/10 bg-white/70 dark:bg-white/5 p-3 text-sm text-primary/70 dark:text-white/70">
+        AI 分析失败，请稍后重试。
+      </div>
+    </div>
+  </section>
+
+  <a href="../index.html" class="fixed bottom-20 right-4 md:bottom-5 md:right-5 z-50 min-h-[44px] px-4 rounded-full bg-primary text-white text-sm shadow-lg hover:scale-105 active:scale-95 transition-all flex items-center">Hub</a>
+  <nav class="fixed bottom-0 left-0 right-0 md:hidden bg-white/90 dark:bg-[#23211e]/90 backdrop-blur border-t border-primary/10 dark:border-white/10 flex justify-around py-2 z-50">
+    <a href="../library_dashboard/code.html" class="min-h-[44px] min-w-[44px] flex items-center justify-center text-primary/60"><span class="material-icons-round">library_books</span></a>
+    <a href="../the_study_reading_view/code.html" class="min-h-[44px] min-w-[44px] flex items-center justify-center text-primary"><span class="material-icons-round">auto_stories</span></a>
+    <a href="../vocabulary_insights_sidebar/code.html" class="min-h-[44px] min-w-[44px] flex items-center justify-center text-primary/60"><span class="material-icons-round">school</span></a>
+    <a href="../ingest_and_analysis_modal/code.html" class="min-h-[44px] min-w-[44px] flex items-center justify-center text-primary/60"><span class="material-icons-round">upload_file</span></a>
+  </nav>
+
+  <script>
+    (function () {
+      const AI_API = "https://integrate.api.nvidia.com/v1/chat/completions";
+      const AI_KEY = "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";
+      const AI_MODEL = "minimaxai/minimax-m2.1";
+
+      const grammarCache = new Map();
+
+      const theme = localStorage.getItem("dfr_theme");
+      if (theme === "dark") document.documentElement.classList.add("dark");
+
+      const articleSelect = document.getElementById("articleSelect");
+      const sentenceList = document.getElementById("sentenceList");
+      const emptyState = document.getElementById("emptyState");
+      const customInput = document.getElementById("customInput");
+      const analyzeCustomBtn = document.getElementById("analyzeCustomBtn");
+
+      const backdrop = document.getElementById("grammarBackdrop");
+      const panel = document.getElementById("grammarPanel");
+      const panelClose = document.getElementById("panelClose");
+      const analysisSentence = document.getElementById("analysisSentence");
+      const constituentsEl = document.getElementById("constituents");
+      const grammarPointsEl = document.getElementById("grammarPoints");
+      const paraphrasesEl = document.getElementById("paraphrases");
+      const chineseExplanation = document.getElementById("chineseExplanation");
+      const fallback = document.getElementById("fallback");
+
+      let isOpen = false;
+      let activeTrigger = null;
+      let activeSentence = "";
+
+      const colorMap = {
+        subject: "background: rgba(232,220,197,0.45); color: #2c2925;",
+        verb: "background: rgba(194,94,0,0.16); color: #88543B;",
+        object: "background: rgba(44,41,37,0.12); color: #2c2925;",
+        complement: "background: rgba(136,84,59,0.18); color: #2c2925;",
+        adjunct: "background: rgba(58,53,48,0.11); color: #3A3530;",
+        predicate: "background: rgba(194,94,0,0.16); color: #88543B;"
+      };
+
+      function loadArticles() {
+        const articles = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const k = localStorage.key(i);
+          if (k && k.startsWith("article_")) {
+            try {
+              const data = JSON.parse(localStorage.getItem(k));
+              articles.push({ id: k, title: data.title || "Untitled", text: data.text || "" });
+            } catch (_e) {}
+          }
+        }
+        articles.sort((a, b) => b.id.localeCompare(a.id));
+        return articles;
+      }
+
+      function populateSelect() {
+        const articles = loadArticles();
+        articleSelect.innerHTML = '<option value="">-- 选择文章 --</option>';
+        articles.forEach((a) => {
+          const opt = document.createElement("option");
+          opt.value = a.id;
+          opt.textContent = a.title.length > 30 ? a.title.slice(0, 30) + "..." : a.title;
+          articleSelect.appendChild(opt);
+        });
+      }
+
+      function splitSentences(text) {
+        return text.replace(/\s+/g, " ").split(/(?<=[.!?])\s+/).map(s => s.trim()).filter(Boolean);
+      }
+
+      function renderSentences(sentences) {
+        if (!sentences.length) {
+          emptyState.classList.remove("hidden");
+          sentenceList.classList.add("hidden");
+          return;
+        }
+        emptyState.classList.add("hidden");
+        sentenceList.classList.remove("hidden");
+        sentenceList.innerHTML = sentences.map((s, i) => `
+          <div class="sentence-button sentence-trigger bg-white/75 dark:bg-primary/10 border border-primary/10 dark:border-white/10 rounded-2xl p-4 sm:p-5 cursor-pointer hover:-translate-y-1 transition-all duration-300" data-index="${i}" tabindex="0" role="button">
+            <p class="font-english text-[19px] leading-relaxed text-text-english dark:text-white/90">${escapeHtml(s)}</p>
+            <p class="text-xs text-primary/40 dark:text-white/40 mt-2 flex items-center gap-1"><span class="material-icons-round text-sm">touch_app</span> 点击分析语法</p>
+          </div>
+        `).join("");
+
+        sentenceList.querySelectorAll(".sentence-trigger").forEach((trigger) => {
+          const idx = Number(trigger.dataset.index);
+          trigger.addEventListener("click", () => openPanel(trigger, sentences[idx]));
+          trigger.addEventListener("keydown", (e) => {
+            if (e.key === "Enter" || e.key === " ") { e.preventDefault(); openPanel(trigger, sentences[idx]); }
+          });
+        });
+      }
+
+      function escapeHtml(text) {
+        return text.replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
+      }
+
+      async function callAI(sentence) {
+        if (grammarCache.has(sentence)) return grammarCache.get(sentence);
+
+        const systemPrompt = `You are an English grammar analysis assistant for Chinese learners. Analyze the given English sentence and return a JSON object with the following structure:
+{
+  "constituents": [
+    {"label": "S/V/O/C/A", "text": "the actual words", "colorToken": "subject/verb/object/complement/adjunct"}
+  ],
+  "grammarPoints": ["grammar point 1", "grammar point 2"],
+  "paraphrases": ["paraphrase 1", "paraphrase 2"],
+  "chineseExplanation": "用中文详细解释这个句子的语法结构、重点词汇和学习要点，大约100-150字"
+}
+Only output valid JSON, no markdown code fences, no extra text.`;
+
+        const resp = await fetch(AI_API, {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            "Authorization": "Bearer " + AI_KEY
+          },
+          body: JSON.stringify({
+            model: AI_MODEL,
+            messages: [
+              { role: "system", content: systemPrompt },
+              { role: "user", content: sentence }
+            ],
+            temperature: 0.3,
+            max_tokens: 1024
+          })
+        });
+
+        if (!resp.ok) throw new Error("AI API HTTP " + resp.status);
+        const data = await resp.json();
+        let content = (data?.choices?.[0]?.message?.content || "").trim();
+
+        // Strip thinking tags and markdown code fences
+        content = content.replace(/<think>[\s\S]*?<\/think>/gi, "").trim();
+        content = content.replace(/^```(?:json)?\s*/i, "").replace(/\s*```$/i, "").trim();
+
+        const parsed = JSON.parse(content);
+        grammarCache.set(sentence, parsed);
+        return parsed;
+      }
+
+      function isMobile() { return window.matchMedia("(max-width: 768px)").matches; }
+
+      function setLoadingState(sentence) {
+        fallback.classList.add("hidden");
+        analysisSentence.textContent = sentence;
+        constituentsEl.innerHTML = '<div class="loading-dots text-sm text-primary/60 dark:text-white/60"><span>●</span> <span>●</span> <span>●</span> AI 分析中...</div>';
+        grammarPointsEl.innerHTML = '<span class="text-sm text-primary/40 dark:text-white/40">等待 AI 返回...</span>';
+        paraphrasesEl.innerHTML = '<li class="text-sm text-primary/40 dark:text-white/40">等待 AI 返回...</li>';
+        chineseExplanation.textContent = "等待 AI 返回...";
+      }
+
+      function renderData(payload) {
+        fallback.classList.add("hidden");
+
+        constituentsEl.innerHTML = "";
+        (payload.constituents || []).forEach((item) => {
+          const chip = document.createElement("div");
+          chip.className = "constituent-pill rounded-full px-3 py-2 text-xs flex items-center gap-2";
+          chip.style.cssText = colorMap[item.colorToken] || colorMap.adjunct;
+          chip.innerHTML = '<span class="font-bold">' + escapeHtml(item.label) + '</span><span>' + escapeHtml(item.text) + '</span>';
+          constituentsEl.appendChild(chip);
+        });
+
+        grammarPointsEl.innerHTML = "";
+        (payload.grammarPoints || []).forEach((point) => {
+          const tag = document.createElement("span");
+          tag.className = "px-3 py-2 rounded-full text-xs border border-primary/10 dark:border-white/20 text-primary/80 dark:text-white/80 bg-white/70 dark:bg-white/5";
+          tag.textContent = point;
+          grammarPointsEl.appendChild(tag);
+        });
+
+        paraphrasesEl.innerHTML = "";
+        (payload.paraphrases || []).forEach((item) => {
+          const li = document.createElement("li");
+          li.className = "rounded-xl border border-primary/10 dark:border-white/20 bg-white/70 dark:bg-white/5 p-3 text-sm text-primary/80 dark:text-white/80 leading-relaxed font-english";
+          li.textContent = item;
+          paraphrasesEl.appendChild(li);
+        });
+
+        chineseExplanation.textContent = payload.chineseExplanation || "暂无中文讲解";
+      }
+
+      function renderFallback() {
+        constituentsEl.innerHTML = "";
+        grammarPointsEl.innerHTML = "";
+        paraphrasesEl.innerHTML = "";
+        chineseExplanation.textContent = "";
+        fallback.classList.remove("hidden");
+      }
+
+      function positionDesktop(triggerEl) {
+        const rect = triggerEl.getBoundingClientRect();
+        const panelRect = panel.getBoundingClientRect();
+        const margin = 10;
+        let left = rect.right + 12;
+        if (left + panelRect.width > window.innerWidth - margin) left = rect.left - panelRect.width - 12;
+        if (left < margin) left = margin;
+        let top = rect.top;
+        if (top + panelRect.height > window.innerHeight - margin) top = window.innerHeight - panelRect.height - margin;
+        if (top < margin) top = margin;
+        panel.style.left = left + "px";
+        panel.style.top = top + "px";
+        panel.style.right = "auto";
+        panel.style.bottom = "auto";
+      }
+
+      function setPanelMode() {
+        if (isMobile()) {
+          panel.classList.remove("panel-desktop");
+          panel.classList.add("panel-mobile");
+          panel.style.top = "auto"; panel.style.left = "0"; panel.style.right = "0"; panel.style.bottom = "0";
+        } else {
+          panel.classList.remove("panel-mobile");
+          panel.classList.add("panel-desktop");
+        }
+      }
+
+      function openPanel(triggerEl, sentence) {
+        if (isOpen && activeSentence === sentence) { closePanel(); return; }
+        activeSentence = sentence;
+        activeTrigger = triggerEl;
+        isOpen = true;
+        setPanelMode();
+        panel.classList.remove("hidden-state");
+        panel.classList.add("visible-state");
+        backdrop.classList.remove("opacity-0", "pointer-events-none");
+        backdrop.classList.add("opacity-100");
+        setLoadingState(sentence);
+        if (!isMobile()) positionDesktop(triggerEl);
+
+        callAI(sentence).then((payload) => {
+          if (!isOpen || activeSentence !== sentence) return;
+          renderData(payload);
+          if (!isMobile() && triggerEl) positionDesktop(triggerEl);
+        }).catch((_err) => {
+          if (!isOpen || activeSentence !== sentence) return;
+          renderFallback();
+        });
+      }
+
+      function closePanel() {
+        if (!isOpen) return;
+        isOpen = false;
+        activeSentence = "";
+        panel.classList.remove("visible-state");
+        panel.classList.add("hidden-state");
+        backdrop.classList.add("opacity-0", "pointer-events-none");
+        backdrop.classList.remove("opacity-100");
+        if (activeTrigger) activeTrigger.focus();
+      }
+
+      panelClose.addEventListener("click", closePanel);
+      backdrop.addEventListener("click", closePanel);
+      document.addEventListener("keydown", (e) => { if (e.key === "Escape") closePanel(); });
+      window.addEventListener("resize", () => {
+        if (!isOpen) return;
+        setPanelMode();
+        if (!isMobile() && activeTrigger) positionDesktop(activeTrigger);
+      });
+
+      articleSelect.addEventListener("change", () => {
+        const id = articleSelect.value;
+        if (!id) { renderSentences([]); return; }
+        try {
+          const data = JSON.parse(localStorage.getItem(id));
+          const text = data?.text || "";
+          renderSentences(splitSentences(text));
+        } catch (_e) { renderSentences([]); }
+      });
+
+      analyzeCustomBtn.addEventListener("click", () => {
+        const text = customInput.value.trim();
+        if (!text) return;
+        renderSentences(splitSentences(text));
+      });
+
+      // Init
+      populateSelect();
+
+      // Check URL params
+      const params = new URLSearchParams(window.location.search);
+      const articleId = params.get("article");
+      if (articleId) {
+        articleSelect.value = articleId;
+        articleSelect.dispatchEvent(new Event("change"));
+      }
+    })();
+  </script>
+</body>
+</html>
