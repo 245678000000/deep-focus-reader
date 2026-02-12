@@ -944,21 +944,31 @@
 
       function waitAudioEnd() {
         return new Promise((resolve, reject) => {
-          const onEnd = () => {
-            cleanup();
+          // If audio is already ended or has no source, resolve immediately
+          if (audio.ended || audio.readyState === 0) {
             resolve();
-          };
-          const onError = () => {
-            cleanup();
-            reject(new Error("Audio playback failed"));
+            return;
+          }
+
+          const onEnd = () => { cleanup(); resolve(); };
+          const onError = () => { cleanup(); reject(new Error("Audio playback failed")); };
+          const onPause = () => {
+            // If paused and ended, treat as ended
+            if (audio.ended) { cleanup(); resolve(); }
           };
           const cleanup = () => {
             audio.removeEventListener("ended", onEnd);
             audio.removeEventListener("error", onError);
+            audio.removeEventListener("pause", onPause);
           };
 
           audio.addEventListener("ended", onEnd);
           audio.addEventListener("error", onError);
+          audio.addEventListener("pause", onPause);
+
+          // Safety timeout: if audio duration is known, wait duration + 5s
+          const safetyMs = (audio.duration && isFinite(audio.duration)) ? (audio.duration * 1000 + 5000) : 120000;
+          window.setTimeout(() => { cleanup(); resolve(); }, safetyMs);
         });
       }
 
@@ -997,12 +1007,17 @@
             readAllBtn.innerHTML = '<span class="material-icons-round text-base">volume_up</span><span>播放中...</span>';
             setStatus(`整篇朗读：第 ${i + 1}/${chunks.length} 段（播放中）`);
             audio.src = url;
-            await audio.play();
+            try {
+              await audio.play();
+            } catch (playErr) {
+              setStatus(`播放被浏览器拦截，请先点击页面任意位置后重试。(${playErr.name})`);
+              throw playErr;
+            }
             await waitAudioEnd();
           }
           setStatus(`整篇朗读完成。(${lastTtsPath || "TTS"})`);
         } catch (error) {
-          setStatus(`整篇朗读失败：${error.message}`);
+          setStatus(`整篇朗读出错：${error.name || "Error"} - ${error.message}`);
         } finally {
           readAllBtn.disabled = false;
           readAllBtn.innerHTML = '<span class="material-icons-round text-base">volume_up</span><span>整篇朗读</span>';
@@ -1034,7 +1049,12 @@
             sentenceModeBtn.innerHTML = '<span class="material-icons-round text-base">pause</span><span>播放中...</span>';
             setStatus(`逐句朗读：第 ${i + 1}/${sentences.length} 句（播放中）`);
             audio.src = url;
-            await audio.play();
+            try {
+              await audio.play();
+            } catch (playErr) {
+              setStatus(`播放被浏览器拦截，请先点击页面任意位置后重试。(${playErr.name})`);
+              throw playErr;
+            }
             await waitAudioEnd();
             if (sentenceModeRunning) sentenceModeBtn.innerHTML = '<span class="material-icons-round text-base animate-spin">autorenew</span><span>合成中...</span>';
           }
@@ -1043,7 +1063,7 @@
             setStatus(`逐句朗读完成。(${lastTtsPath || "TTS"})`);
           }
         } catch (error) {
-          setStatus(`逐句朗读失败：${error.message}`);
+          setStatus(`逐句朗读出错：${error.name || "Error"} - ${error.message}`);
         } finally {
           if (token === sentencePlayToken) {
             sentenceModeRunning = false;
