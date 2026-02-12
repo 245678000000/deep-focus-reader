@@ -146,7 +146,8 @@
 
   <script>
     (function () {
-      const AI_API = "https://integrate.api.nvidia.com/v1/chat/completions";
+      const AI_PROXY = "/api/ai-proxy";
+      const AI_DIRECT = "https://integrate.api.nvidia.com/v1/chat/completions";
       const AI_KEY = "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";
       const AI_MODEL = "minimaxai/minimax-m2.1";
 
@@ -256,22 +257,34 @@
 }
 Only output valid JSON, no markdown code fences, no extra text.`;
 
-        const resp = await fetch(AI_API, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": "Bearer " + AI_KEY
-          },
-          body: JSON.stringify({
-            model: AI_MODEL,
-            messages: [
-              { role: "system", content: systemPrompt },
-              { role: "user", content: sentence }
-            ],
-            temperature: 0.3,
-            max_tokens: 1024
-          })
-        });
+        const payload = {
+          model: AI_MODEL,
+          messages: [
+            { role: "system", content: systemPrompt },
+            { role: "user", content: sentence }
+          ],
+          temperature: 0.3,
+          max_tokens: 1024
+        };
+
+        // Try proxy first (for Vercel deployment), then direct (for local)
+        let resp;
+        try {
+          resp = await fetch(AI_PROXY, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload)
+          });
+        } catch (_e) {
+          resp = await fetch(AI_DIRECT, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              "Authorization": "Bearer " + AI_KEY
+            },
+            body: JSON.stringify(payload)
+          });
+        }
 
         if (!resp.ok) throw new Error("AI API HTTP " + resp.status);
         const data = await resp.json();
