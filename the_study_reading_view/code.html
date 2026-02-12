@@ -914,16 +914,28 @@
           pitch: "0"
         };
 
+        // 超时时间：30秒
+        const FETCH_TIMEOUT_MS = 30000;
         const endpoints = [TTS_PROXY_ENDPOINT, TTS_ENDPOINT];
         let lastError = null;
 
         for (const endpoint of endpoints) {
+          // 使用 AbortController 控制超时
+          const controller = new AbortController();
+          const timeoutId = window.setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
+
           try {
+            console.log(`[TTS] 正在请求: ${endpoint}，文本长度: ${text.length}`);
+            setStatus(`TTS 合成中（${endpoint === TTS_PROXY_ENDPOINT ? "代理" : "直连"}）...`);
+
             const response = await fetch(endpoint, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(payload)
+              body: JSON.stringify(payload),
+              signal: controller.signal
             });
+
+            console.log(`[TTS] 响应状态: ${response.status}，Content-Type: ${response.headers.get("content-type")}`);
 
             if (!response.ok) {
               const detail = await response.text();
@@ -937,18 +949,33 @@
             }
 
             const blob = await response.blob();
+            console.log(`[TTS] 获得音频 blob: ${blob.size} bytes，type: ${blob.type}`);
+
+            if (blob.size < 100) {
+              throw new Error(`音频数据过小 (${blob.size} bytes)，可能合成失败`);
+            }
+
             const url = URL.createObjectURL(blob);
             audioCache.set(key, url);
             lastTtsPath = endpoint;
             return url;
           } catch (error) {
-            lastError = error;
+            // 区分超时和其他错误
+            if (error.name === "AbortError") {
+              console.warn(`[TTS] 请求超时 (${FETCH_TIMEOUT_MS / 1000}s): ${endpoint}`);
+              lastError = new Error(`请求超时 (${FETCH_TIMEOUT_MS / 1000}秒)，网络可能不稳定`);
+            } else {
+              console.warn(`[TTS] 请求失败: ${endpoint}`, error.message);
+              lastError = error;
+            }
+          } finally {
+            window.clearTimeout(timeoutId);
           }
         }
 
         const message = String(lastError && lastError.message ? lastError.message : lastError);
         if (message.toLowerCase().includes("failed to fetch") || message.toLowerCase().includes("networkerror")) {
-          throw new Error("TTS 无法访问（可能是跨域/CORS），请在 Vercel dev 下运行。");
+          throw new Error("TTS 网络无法访问，请检查网络连接或刷新页面重试。");
         }
         throw new Error(`TTS 调用失败：${message}`);
       }
