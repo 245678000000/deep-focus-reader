@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><title>TTS Test</title></head>
+<body style="font-family:sans-serif;padding:2rem;">
+<h2>TTS Debug Test</h2>
+<button id="testBtn" style="padding:12px 24px;font-size:16px;">点击测试朗读</button>
+<pre id="log" style="background:#f5f5f5;padding:1rem;margin-top:1rem;white-space:pre-wrap;max-height:400px;overflow:auto;"></pre>
+<script>
+const log = document.getElementById('log');
+function addLog(msg) {
+  const time = new Date().toLocaleTimeString();
+  log.textContent += `[${time}] ${msg}\n`;
+  log.scrollTop = log.scrollHeight;
+  console.log(msg);
+}
+
+document.getElementById('testBtn').addEventListener('click', async () => {
+  addLog('=== 开始测试 ===');
+
+  // Step 1: fetch audio
+  addLog('Step 1: 请求 TTS API...');
+  try {
+    const resp = await fetch('/api/tts-proxy', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text: 'Hello, this is a test.',
+        voice_name: 'en-US-JennyNeural',
+        style: 'general',
+        rate: '0',
+        pitch: '0'
+      })
+    });
+    addLog(`Step 1 结果: HTTP ${resp.status}, Content-Type: ${resp.headers.get('content-type')}`);
+
+    if (!resp.ok) {
+      const txt = await resp.text();
+      addLog('错误详情: ' + txt.slice(0, 300));
+      return;
+    }
+
+    const contentType = resp.headers.get('content-type') || '';
+    addLog('Content-Type: ' + contentType);
+
+    // Step 2: create blob
+    const blob = await resp.blob();
+    addLog(`Step 2: Blob 大小 = ${blob.size} bytes, type = "${blob.type}"`);
+
+    if (blob.size === 0) {
+      addLog('错误: Blob 为空!');
+      return;
+    }
+
+    // Step 3: create object URL
+    const url = URL.createObjectURL(blob);
+    addLog('Step 3: ObjectURL = ' + url);
+
+    // Step 4: play audio
+    const audio = new Audio();
+    addLog('Step 4: 创建 Audio 对象...');
+
+    audio.addEventListener('loadedmetadata', () => {
+      addLog('事件: loadedmetadata, duration = ' + audio.duration);
+    });
+    audio.addEventListener('canplay', () => {
+      addLog('事件: canplay');
+    });
+    audio.addEventListener('playing', () => {
+      addLog('事件: playing');
+    });
+    audio.addEventListener('ended', () => {
+      addLog('事件: ended (播放完成!)');
+    });
+    audio.addEventListener('error', (e) => {
+      addLog('事件: error! code=' + (audio.error ? audio.error.code + ' msg=' + audio.error.message : 'unknown'));
+    });
+    audio.addEventListener('stalled', () => {
+      addLog('事件: stalled (数据加载停滞)');
+    });
+    audio.addEventListener('waiting', () => {
+      addLog('事件: waiting');
+    });
+
+    audio.src = url;
+    addLog('Step 4: 设置 src, 调用 play()...');
+
+    try {
+      await audio.play();
+      addLog('Step 4: play() 成功返回!');
+    } catch (err) {
+      addLog('Step 4: play() 失败! ' + err.name + ': ' + err.message);
+    }
+
+  } catch (err) {
+    addLog('请求失败: ' + err.name + ': ' + err.message);
+  }
+});
+</script>
+</body>
+</html>
