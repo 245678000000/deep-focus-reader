@@ -13,7 +13,7 @@ audio{display:block;margin-top:1rem;width:100%}
 <p>点击下方按钮逐步测试 TTS 功能</p>
 <div>
 <button id="testProxy">1. 测试 /api/tts-proxy</button>
-<button id="testDirect">2. 测试直连 TTS</button>
+<button id="testDirect">2. 测试代理重试</button>
 <button id="testPlay">3. 测试音频播放</button>
 <button id="clearLog">清除日志</button>
 </div>
@@ -95,7 +95,7 @@ async function testEndpoint(url, label) {
 
 document.getElementById('testProxy').onclick = () => testEndpoint('/api/tts-proxy', '代理 /api/tts-proxy');
 
-document.getElementById('testDirect').onclick = () => testEndpoint('https://tts-webs.vercel.app/api/synthesize', '直连 TTS');
+document.getElementById('testDirect').onclick = () => testEndpoint('/api/tts-proxy', '代理重试测试 /api/tts-proxy');
 
 document.getElementById('testPlay').onclick = async () => {
   log('--- 测试音频播放 ---');
