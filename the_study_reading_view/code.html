@@ -4,6 +4,7 @@
 <!-- [DONE] P1-2: 阅读进度跟踪 - 2026-02-12 -->
 <!-- [DONE] P1-3: 移动端导航 - 2026-02-12 -->
 <!-- [DONE] FIX: 设置抽屉集成 + 翻译限额提示 + meta - 2026-02-12 -->
+<!-- [DONE] WEEK-1: Zen Mode + Drawer sidebar + TTS bar + Pronunciation + Dark fix - 2026-02-25 -->
 <html lang="zh-CN">
 <head>
   <meta charset="utf-8" />
@@ -23,373 +24,398 @@
         extend: {
           colors: {
             primary: "#2c2925",
-            "background-light": "#f9f8f4",
-            "background-dark": "#1a1918",
+            "background-light": "#FAF8F5",
+            "background-dark": "#191816",
             "accent-gold": "#E8DCC5",
             "accent-sienna": "#C25E00",
+            "accent-sienna-bright": "#E8943B",
             "accent-sienna-deep": "#88543B",
             "paper-texture": "#fdfbf7",
-            "text-english": "#3A3530",
-            "text-chinese": "#8C867D"
+            "text-english": "#2D2A26",
+            "text-chinese": "#9C9590",
+            "surface-dark": "#242220",
+            "surface-dark-2": "#2e2b28"
           },
           fontFamily: {
             display: ["Space Grotesk", "sans-serif"],
             english: ["Crimson Pro", "serif"],
             chinese: ["Noto Serif SC", "serif"],
             "serif-header": ["Spectral", "serif"]
-          },
-          borderRadius: {
-            DEFAULT: "1rem",
-            lg: "2rem",
-            xl: "3rem",
-            full: "9999px"
-          },
-          backgroundImage: {
-            "paper-grain": "url('data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.65%22 numOctaves=%223%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22 opacity=%220.04%22/%3E%3C/svg%3E')"
           }
         }
       }
     };
   </script>
   <style>
-    :root {
-      --en-size: 19px;
-      --cn-size: 15px;
-      --line-height: 1.8;
-    }
+    :root { --en-size: 19px; --cn-size: 15px; --line-height: 1.8; }
 
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
 
-    .sentence-card {
-      box-shadow: 0 2px 8px rgba(44, 41, 37, 0.04);
-      transition: transform 0.3s ease, box-shadow 0.3s ease, background-color 0.3s ease;
-    }
+    /* ── Sentence styling ── */
+    .sentence-group { transition: background-color 0.3s ease, opacity 0.3s ease; border-radius: 0.5rem; padding: 0.75rem 1rem; margin: 0 -1rem; }
+    .sentence-group:hover { background-color: rgba(232, 220, 197, 0.15); }
+    .dark .sentence-group:hover { background-color: rgba(232, 148, 59, 0.06); }
+    .sentence-group.active-play { background-color: rgba(232, 220, 197, 0.35); }
+    .dark .sentence-group.active-play { background-color: rgba(232, 148, 59, 0.12); }
+    .sentence-group.read-past { opacity: 0.7; }
 
-    .sentence-card:hover { transform: translateY(-4px); }
-
-    .sentence-card.active-play {
-      background-color: rgba(232, 220, 197, 0.52);
-      box-shadow: 0 0 0 1px rgba(194, 94, 0, 0.24), 0 10px 22px rgba(44, 41, 37, 0.12);
-    }
-
-    .en-line {
-      font-size: var(--en-size);
-      line-height: var(--line-height);
-    }
-
-    .cn-line {
-      font-size: var(--cn-size);
-      line-height: var(--line-height);
-      color: #8c867d;
-      transition: opacity 0.2s ease, max-height 0.2s ease, transform 0.2s ease;
-    }
+    .en-line { font-size: var(--en-size); line-height: var(--line-height); }
+    .cn-line { font-size: var(--cn-size); line-height: var(--line-height); transition: opacity 0.2s ease, max-height 0.25s ease, margin 0.25s ease; }
 
     #readingRoot[data-reading-mode="english"] .cn-line { display: none; }
     #readingRoot[data-reading-mode="chinese"] .en-line { display: none; }
+    #readingRoot[data-reading-mode="hover-cn"] .cn-line { max-height: 0; opacity: 0; overflow: hidden; margin-top: 0; pointer-events: none; }
+    #readingRoot[data-reading-mode="hover-cn"] .sentence-group:hover .cn-line,
+    #readingRoot[data-reading-mode="hover-cn"] .sentence-group:focus-within .cn-line { max-height: 200px; opacity: 1; margin-top: 0.5rem; pointer-events: auto; }
 
-    #readingRoot[data-reading-mode="hover-cn"] .cn-line {
-      max-height: 0;
-      opacity: 0;
-      overflow: hidden;
-      transform: translateY(-4px);
-      margin-top: 0;
-      pointer-events: none;
-    }
+    .mode-btn[data-active="true"] { background: #2c2925; color: #FAF8F5; border-color: transparent; }
+    .dark .mode-btn[data-active="true"] { background: #E8943B; color: #191816; }
 
-    #readingRoot[data-reading-mode="hover-cn"] .sentence-card:hover .cn-line,
-    #readingRoot[data-reading-mode="hover-cn"] .sentence-card:focus-within .cn-line {
-      max-height: 180px;
-      opacity: 1;
-      transform: translateY(0);
-      margin-top: 0.5rem;
-      pointer-events: auto;
-    }
+    /* ── Word tokens ── */
+    .word-token { cursor: pointer; border-radius: 0.25rem; padding: 0 2px; transition: background-color 0.15s, color 0.15s; text-decoration-line: underline; text-decoration-style: dotted; text-decoration-color: transparent; text-underline-offset: 4px; }
+    .word-token:hover { background-color: rgba(194, 94, 0, 0.1); text-decoration-color: rgba(194, 94, 0, 0.3); }
+    .dark .word-token:hover { background-color: rgba(232, 148, 59, 0.12); text-decoration-color: rgba(232, 148, 59, 0.3); }
+    .word-token.word-active { background-color: rgba(194, 94, 0, 0.22); color: #88543B; transform: scale(1.05); }
+    .dark .word-token.word-active { background-color: rgba(232, 148, 59, 0.2); color: #E8943B; }
+    .word-token.word-spoken { color: #88543B; }
+    .dark .word-token.word-spoken { color: #E8943B; }
 
-    .mode-btn[data-active="true"] {
-      background: #2c2925;
-      color: #f9f8f4;
-      border-color: transparent;
-    }
+    /* ── Word popover ── */
+    .word-pop { transition: opacity 0.2s ease, transform 0.2s ease; transform: translateY(4px); }
+    .word-pop.visible { opacity: 1; transform: translateY(0); pointer-events: auto; }
+    .word-pop.hidden { opacity: 0; pointer-events: none; }
 
-    .word-token {
-      cursor: pointer;
-      border-radius: 0.35rem;
-      padding: 0 2px;
-      transition: background-color 0.15s ease, color 0.15s ease, transform 0.15s ease;
-    }
+    /* ── Left drawer ── */
+    #drawerOverlay { position: fixed; inset: 0; background: rgba(0,0,0,0.3); backdrop-filter: blur(4px); z-index: 45; opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
+    #drawerOverlay.open { opacity: 1; pointer-events: auto; }
+    #leftDrawer { position: fixed; top: 0; left: 0; bottom: 0; width: min(380px, 88vw); z-index: 46; transform: translateX(-100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1); overflow-y: auto; }
+    #leftDrawer.open { transform: translateX(0); }
 
-    .word-token:hover,
-    .word-token:focus-visible {
-      background-color: rgba(232, 220, 197, 0.72);
-      outline: none;
-    }
-
-    .word-token.word-active {
-      background-color: rgba(194, 94, 0, 0.25);
-      color: #88543B;
-      transform: scale(1.08);
-      border-radius: 0.35rem;
-    }
-
-    .word-token.word-spoken {
-      color: #88543B;
-    }
-
-    .word-pop {
-      transition: opacity 0.2s ease, transform 0.2s ease;
-      transform: translateY(4px);
-    }
-
-    .word-pop.visible {
-      opacity: 1;
-      transform: translateY(0);
-      pointer-events: auto;
-    }
-
-    .word-pop.hidden {
-      opacity: 0;
-      pointer-events: none;
-    }
-
+    /* ── Settings drawer (right) ── */
     .settings-drawer { transform: translateX(100%); transition: transform 0.3s ease; }
     .settings-drawer.drawer-open { transform: translateX(0); }
     .settings-overlay { opacity: 0; pointer-events: none; transition: opacity 0.3s ease; }
     .settings-overlay.overlay-open { opacity: 1; pointer-events: auto; }
-    .settings-chip[aria-pressed="true"] { background: #2c2925; color: #f9f8f4; border-color: transparent; }
+    .settings-chip[aria-pressed="true"] { background: #2c2925; color: #FAF8F5; border-color: transparent; }
+    .dark .settings-chip[aria-pressed="true"] { background: #E8943B; color: #191816; }
+
+    /* ── Topbar auto-hide ── */
+    #topbar { transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.35s ease; }
+    #topbar.topbar-hidden { transform: translateY(-100%); opacity: 0; pointer-events: none; }
+
+    /* ── TTS bar ── */
+    #ttsBar { transition: transform 0.35s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.35s ease; }
+    #ttsBar.tts-hidden { transform: translateY(100%); opacity: 0; pointer-events: none; }
+
+    /* ── TTS progress range ── */
+    #ttsProgress { -webkit-appearance: none; appearance: none; height: 4px; border-radius: 2px; background: rgba(44,41,37,0.15); outline: none; cursor: pointer; }
+    #ttsProgress::-webkit-slider-thumb { -webkit-appearance: none; width: 14px; height: 14px; border-radius: 50%; background: #C25E00; cursor: pointer; border: 2px solid white; box-shadow: 0 1px 4px rgba(0,0,0,0.2); }
+    #ttsProgress::-moz-range-thumb { width: 14px; height: 14px; border-radius: 50%; background: #C25E00; cursor: pointer; border: 2px solid white; box-shadow: 0 1px 4px rgba(0,0,0,0.2); }
+    .dark #ttsProgress { background: rgba(255,255,255,0.15); }
+    .dark #ttsProgress::-webkit-slider-thumb { background: #E8943B; border-color: #242220; }
+    .dark #ttsProgress::-moz-range-thumb { background: #E8943B; border-color: #242220; }
+
+    /* ── Zen mode body ── */
+    body.zen-mode { cursor: none; }
+    body.zen-mode.cursor-visible { cursor: auto; }
+
+    /* ── Sentence divider ── */
+    .sentence-divider { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 4px 0; opacity: 0.2; }
+    .sentence-divider span { width: 4px; height: 4px; border-radius: 50%; background: currentColor; }
   </style>
 </head>
-<body id="readingRoot" data-reading-mode="english" class="bg-background-light dark:bg-background-dark text-primary font-display h-screen overflow-hidden">
-  <div class="h-full flex">
-    <nav class="hidden md:flex w-16 h-full flex-col items-center py-6 bg-white/55 dark:bg-primary/5 backdrop-blur-sm border-r border-primary/5 shrink-0">
-      <a href="../index.html" class="mb-5 w-10 h-10 bg-primary text-white rounded-xl flex items-center justify-center font-bold text-xl shadow-lg" aria-label="Back to hub">D</a>
-      <div class="flex-1 flex flex-col gap-4 w-full items-center">
-        <a href="../library_dashboard/code.html" class="w-11 h-11 min-h-[44px] min-w-[44px] flex items-center justify-center text-primary/50 hover:text-primary hover:bg-primary/5 rounded-xl transition-all hover:scale-105 active:scale-95" aria-label="Library">
-          <span class="material-icons-round">library_books</span>
+<body id="readingRoot" data-reading-mode="english" class="bg-background-light dark:bg-background-dark text-primary dark:text-white/90 font-display antialiased">
+
+  <!-- ═══════ TOPBAR ═══════ -->
+  <header id="topbar" class="fixed top-0 inset-x-0 h-12 px-3 sm:px-5 flex items-center justify-between bg-background-light/85 dark:bg-background-dark/85 backdrop-blur-md border-b border-black/5 dark:border-white/8 z-30">
+    <div class="flex items-center gap-2 min-w-0">
+      <button id="menuBtn" class="w-10 h-10 rounded-xl flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 transition-colors" aria-label="Open menu">
+        <span class="material-icons-round text-[22px]">menu</span>
+      </button>
+      <span id="articleTitleBar" class="text-sm font-medium truncate max-w-[50vw] opacity-70">Deep Focus Reader</span>
+    </div>
+    <div class="flex items-center gap-1">
+      <button id="zenBtn" class="w-10 h-10 rounded-xl flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 transition-colors" aria-label="Zen Mode (F)" title="Zen Mode (F)">
+        <span class="material-icons-round text-[20px]">auto_stories</span>
+      </button>
+      <button id="openSettingsBtn" class="w-10 h-10 rounded-xl flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 transition-colors" aria-label="Settings">
+        <span class="material-icons-round text-[20px]">text_fields</span>
+      </button>
+      <button id="themeToggle" class="w-10 h-10 rounded-xl flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 transition-colors" aria-label="Toggle theme">
+        <span class="material-icons-round text-[20px]">dark_mode</span>
+      </button>
+      <a href="../index.html" class="hidden sm:flex w-10 h-10 rounded-xl items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 transition-colors" aria-label="Hub">
+        <span class="material-icons-round text-[20px]">dashboard</span>
+      </a>
+    </div>
+  </header>
+
+  <!-- ═══════ LEFT DRAWER OVERLAY ═══════ -->
+  <div id="drawerOverlay"></div>
+
+  <!-- ═══════ LEFT DRAWER ═══════ -->
+  <aside id="leftDrawer" class="bg-background-light dark:bg-surface-dark border-r border-black/5 dark:border-white/8 no-scrollbar">
+    <div class="p-4 sm:p-5 border-b border-black/5 dark:border-white/8 flex items-center justify-between sticky top-0 bg-background-light/95 dark:bg-surface-dark/95 backdrop-blur-sm z-10">
+      <div>
+        <h2 class="font-serif-header text-xl">Deep Focus Reader</h2>
+        <p class="text-xs opacity-50 mt-0.5">阅读控制面板</p>
+      </div>
+      <button id="closeDrawerBtn" class="w-10 h-10 rounded-xl flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 transition-colors" aria-label="Close">
+        <span class="material-icons-round">close</span>
+      </button>
+    </div>
+    <div class="p-4 sm:p-5 space-y-4 pb-24">
+      <!-- Navigation -->
+      <div class="flex gap-2">
+        <a href="../library_dashboard/code.html" class="flex-1 h-10 rounded-xl border border-black/8 dark:border-white/12 flex items-center justify-center gap-1.5 text-xs hover:bg-black/5 dark:hover:bg-white/8 transition-colors">
+          <span class="material-icons-round text-sm">library_books</span>图书馆
         </a>
-        <a href="./code.html" class="w-11 h-11 min-h-[44px] min-w-[44px] flex items-center justify-center text-primary bg-primary/10 rounded-xl transition-all hover:scale-105 active:scale-95" aria-label="Reading">
-          <span class="material-icons-round">auto_stories</span>
+        <a href="../vocabulary_insights_sidebar/code.html" class="flex-1 h-10 rounded-xl border border-black/8 dark:border-white/12 flex items-center justify-center gap-1.5 text-xs hover:bg-black/5 dark:hover:bg-white/8 transition-colors">
+          <span class="material-icons-round text-sm">school</span>生词本
         </a>
-        <a href="../vocabulary_insights_sidebar/code.html" class="w-11 h-11 min-h-[44px] min-w-[44px] flex items-center justify-center text-primary/50 hover:text-primary hover:bg-primary/5 rounded-xl transition-all hover:scale-105 active:scale-95" aria-label="Vocabulary">
-          <span class="material-icons-round">school</span>
-        </a>
-        <a href="../ingest_and_analysis_modal/code.html" class="w-11 h-11 min-h-[44px] min-w-[44px] flex items-center justify-center text-primary/50 hover:text-primary hover:bg-primary/5 rounded-xl transition-all hover:scale-105 active:scale-95" aria-label="Ingest">
-          <span class="material-icons-round">upload_file</span>
+        <a href="../ingest_and_analysis_modal/code.html" class="flex-1 h-10 rounded-xl border border-black/8 dark:border-white/12 flex items-center justify-center gap-1.5 text-xs hover:bg-black/5 dark:hover:bg-white/8 transition-colors">
+          <span class="material-icons-round text-sm">upload_file</span>导入
         </a>
       </div>
-      <button id="themeToggle" class="w-11 h-11 min-h-[44px] min-w-[44px] rounded-xl text-primary/50 hover:text-primary hover:bg-primary/5 transition-all hover:scale-105 active:scale-95" aria-label="Toggle dark mode">
-        <span class="material-icons-round">dark_mode</span>
-      </button>
-    </nav>
 
-    <main class="flex-1 h-full overflow-hidden flex flex-col">
-      <header class="px-4 sm:px-6 py-4 border-b border-primary/10 dark:border-white/10 bg-background-light/85 dark:bg-background-dark/85 backdrop-blur-md">
-        <div class="flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <h1 class="font-serif-header text-2xl sm:text-3xl text-primary dark:text-white">Deep Focus Reader</h1>
-            <p id="articleMeta" class="text-sm text-primary/65 dark:text-white/65">输入英文文章、点词查询、整篇朗读、逐句朗读高亮</p>
-          </div>
-          <div class="flex items-center gap-2 text-xs text-primary/60 dark:text-white/65">
-            <button id="openSettingsBtn" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-full border border-primary/15 dark:border-white/15 hover:bg-primary/5 dark:hover:bg-white/10 transition-all" type="button">
-              <span class="material-icons-round text-base">text_fields</span>
-              <span>Aa 设置</span>
-            </button>
-            <span class="hidden sm:inline">TTS: <code>/api/tts-proxy</code></span>
+      <!-- Presets -->
+      <section class="rounded-2xl border border-black/8 dark:border-white/10 bg-white/60 dark:bg-white/5 p-4">
+        <label for="presetSelect" class="block text-sm font-medium mb-2">预设文章 / Presets</label>
+        <div class="flex gap-2">
+          <select id="presetSelect" class="flex-1 h-10 rounded-xl border-black/10 dark:border-white/15 bg-white dark:bg-surface-dark-2 text-sm">
+            <option value="ai_ethics">AI Ethics in Education</option>
+            <option value="deep_work">The Value of Deep Work</option>
+            <option value="climate">Climate and Data Science</option>
+          </select>
+          <button id="loadPresetBtn" class="h-10 px-4 rounded-xl bg-accent-sienna text-white text-sm font-medium hover:opacity-90 active:scale-95 transition-all">载入</button>
+        </div>
+      </section>
+
+      <!-- Text input -->
+      <section class="rounded-2xl border border-black/8 dark:border-white/10 bg-white/60 dark:bg-white/5 p-4">
+        <label for="articleInput" class="block text-sm font-medium mb-2">输入/粘贴英文文章</label>
+        <textarea id="articleInput" rows="6" class="w-full rounded-xl border-black/10 dark:border-white/15 bg-white dark:bg-surface-dark-2 text-sm leading-relaxed placeholder:text-black/30 dark:placeholder:text-white/30 dark:text-white/90" placeholder="Paste your English article here..."></textarea>
+        <button id="renderArticleBtn" class="mt-3 w-full h-10 rounded-xl bg-primary dark:bg-white/90 text-white dark:text-primary text-sm font-medium hover:opacity-90 active:scale-[0.98] transition-all">生成阅读视图</button>
+      </section>
+
+      <!-- TTS Settings -->
+      <section class="rounded-2xl border border-black/8 dark:border-white/10 bg-white/60 dark:bg-white/5 p-4 space-y-3">
+        <h2 class="text-sm font-semibold">朗读设置 / TTS</h2>
+        <div>
+          <label for="voiceSelect" class="block text-xs opacity-60 mb-1">音色 Voice</label>
+          <select id="voiceSelect" class="w-full h-10 rounded-xl border-black/10 dark:border-white/15 bg-white dark:bg-surface-dark-2 text-sm dark:text-white/90">
+            <option value="en-US-JennyNeural">美式女声 · en-US-JennyNeural</option>
+            <option value="en-US-BrianNeural">美式男声 · en-US-BrianNeural</option>
+            <option value="en-GB-SoniaNeural">英式女声 · en-GB-SoniaNeural</option>
+            <option value="en-GB-RyanNeural">英式男声 · en-GB-RyanNeural</option>
+          </select>
+        </div>
+        <div>
+          <label for="rateSelect" class="block text-xs opacity-60 mb-1">语速 Rate</label>
+          <select id="rateSelect" class="w-full h-10 rounded-xl border-black/10 dark:border-white/15 bg-white dark:bg-surface-dark-2 text-sm dark:text-white/90">
+            <option value="-30">慢速 Slow (-30)</option>
+            <option value="0" selected>正常 Normal (0)</option>
+            <option value="30">快速 Fast (30)</option>
+          </select>
+        </div>
+        <div class="grid grid-cols-2 gap-2">
+          <button id="readAllBtn" class="h-10 rounded-xl bg-primary dark:bg-white/90 text-white dark:text-primary text-sm font-medium hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-1.5">
+            <span class="material-icons-round text-base">volume_up</span><span>整篇朗读</span>
+          </button>
+          <button id="sentenceModeBtn" class="h-10 rounded-xl bg-accent-sienna text-white text-sm font-medium hover:opacity-90 active:scale-95 transition-all flex items-center justify-center gap-1.5">
+            <span class="material-icons-round text-base">record_voice_over</span><span>逐句朗读</span>
+          </button>
+        </div>
+
+        <!-- Reading mode -->
+        <div class="pt-3 border-t border-black/8 dark:border-white/8 space-y-2">
+          <p class="text-xs font-medium opacity-60">双语模式 / Reading Mode</p>
+          <div class="grid grid-cols-2 gap-2">
+            <button class="mode-btn h-9 rounded-xl border border-black/10 dark:border-white/15 text-xs transition-all" data-mode="english">英文模式</button>
+            <button class="mode-btn h-9 rounded-xl border border-black/10 dark:border-white/15 text-xs transition-all" data-mode="bilingual">双语对照</button>
+            <button class="mode-btn h-9 rounded-xl border border-black/10 dark:border-white/15 text-xs transition-all" data-mode="hover-cn">悬浮中文</button>
+            <button class="mode-btn h-9 rounded-xl border border-black/10 dark:border-white/15 text-xs transition-all" data-mode="chinese">仅中文</button>
           </div>
         </div>
-      </header>
 
-      <div class="flex-1 overflow-hidden grid grid-cols-1 xl:grid-cols-[360px_1fr]">
-        <aside class="border-b xl:border-b-0 xl:border-r border-primary/10 dark:border-white/10 p-4 sm:p-5 overflow-y-auto no-scrollbar bg-paper-texture/50 dark:bg-primary/10">
-          <div class="space-y-5 pb-20 xl:pb-6">
-            <section class="rounded-2xl border border-primary/10 dark:border-white/10 bg-white/75 dark:bg-white/5 p-4">
-              <label for="presetSelect" class="block text-sm font-medium mb-2">预设文章 / Presets</label>
-              <div class="flex gap-2">
-                <select id="presetSelect" class="flex-1 rounded-xl border-primary/15 dark:border-white/20 bg-white/90 dark:bg-white/5 text-sm">
-                  <option value="ai_ethics">AI Ethics in Education</option>
-                  <option value="deep_work">The Value of Deep Work</option>
-                  <option value="climate">Climate and Data Science</option>
-                </select>
-                <button id="loadPresetBtn" class="min-h-[44px] px-3 rounded-xl bg-primary text-white text-sm hover:scale-105 active:scale-95 transition-all">载入</button>
-              </div>
-            </section>
-
-            <section class="rounded-2xl border border-primary/10 dark:border-white/10 bg-white/75 dark:bg-white/5 p-4">
-              <label for="articleInput" class="block text-sm font-medium mb-2">输入/粘贴英文文章</label>
-              <textarea id="articleInput" rows="9" class="w-full rounded-xl border-primary/15 dark:border-white/20 bg-white/90 dark:bg-white/5 text-sm leading-relaxed" placeholder="Paste your English article here..."></textarea>
-              <button id="renderArticleBtn" class="mt-3 w-full min-h-[44px] rounded-xl bg-primary text-white text-sm font-medium hover:scale-105 active:scale-95 transition-all">生成阅读视图</button>
-            </section>
-
-            <section class="rounded-2xl border border-primary/10 dark:border-white/10 bg-white/75 dark:bg-white/5 p-4 space-y-3">
-              <h2 class="text-sm font-semibold">朗读设置 / TTS</h2>
-              <div>
-                <label for="voiceSelect" class="block text-xs text-primary/70 dark:text-white/70 mb-1">音色 Voice</label>
-                <select id="voiceSelect" class="w-full rounded-xl border-primary/15 dark:border-white/20 bg-white/90 dark:bg-white/5 text-sm">
-                  <option value="en-US-JennyNeural">美式女声 · en-US-JennyNeural</option>
-                  <option value="en-US-BrianNeural">美式男声 · en-US-BrianNeural</option>
-                  <option value="en-GB-SoniaNeural">英式女声 · en-GB-SoniaNeural</option>
-                  <option value="en-GB-RyanNeural">英式男声 · en-GB-RyanNeural</option>
-                </select>
-              </div>
-              <div>
-                <label for="rateSelect" class="block text-xs text-primary/70 dark:text-white/70 mb-1">语速 Rate</label>
-                <select id="rateSelect" class="w-full rounded-xl border-primary/15 dark:border-white/20 bg-white/90 dark:bg-white/5 text-sm">
-                  <option value="-30">慢速 Slow (-30)</option>
-                  <option value="0" selected>正常 Normal (0)</option>
-                  <option value="30">快速 Fast (30)</option>
-                </select>
-              </div>
-              <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                <button id="readAllBtn" class="min-h-[44px] rounded-xl bg-primary text-white text-sm font-medium hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-1.5">
-                  <span class="material-icons-round text-base">volume_up</span>
-                  <span>整篇朗读</span>
-                </button>
-                <button id="sentenceModeBtn" class="min-h-[44px] rounded-xl bg-accent-sienna text-white text-sm font-medium hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-1.5">
-                  <span class="material-icons-round text-base">record_voice_over</span>
-                  <span>逐句朗读</span>
-                </button>
-              </div>
-              <button id="stopBtn" class="w-full min-h-[44px] rounded-xl border border-primary/15 dark:border-white/20 text-sm hover:bg-primary/5 dark:hover:bg-white/10 transition-all">停止播放</button>
-
-              <div class="pt-2 border-t border-primary/10 dark:border-white/10 space-y-2">
-                <p class="text-xs font-medium text-primary/70 dark:text-white/70">双语模式 / Reading Mode</p>
-                <div class="grid grid-cols-2 gap-2">
-                  <button class="mode-btn min-h-[44px] rounded-xl border border-primary/15 dark:border-white/20 text-xs" data-mode="english">英文模式</button>
-                  <button class="mode-btn min-h-[44px] rounded-xl border border-primary/15 dark:border-white/20 text-xs" data-mode="bilingual">双语对照</button>
-                  <button class="mode-btn min-h-[44px] rounded-xl border border-primary/15 dark:border-white/20 text-xs" data-mode="hover-cn">悬浮中文</button>
-                  <button class="mode-btn min-h-[44px] rounded-xl border border-primary/15 dark:border-white/20 text-xs" data-mode="chinese">仅中文</button>
-                </div>
-              </div>
-              <p id="statusText" class="text-xs text-primary/65 dark:text-white/70 leading-relaxed">状态：待机。点击单词可查询音标和中文释义。</p>
-
-              <div class="pt-2 border-t border-primary/10 dark:border-white/10 space-y-2">
-                <p class="text-xs font-medium text-primary/70 dark:text-white/70">AI 工具</p>
-                <div class="grid grid-cols-2 gap-2">
-                  <a id="linkGrammar" href="../grammar_analysis_popover/code.html" class="min-h-[44px] rounded-xl border border-primary/15 dark:border-white/20 text-xs flex items-center justify-center gap-1 hover:bg-primary/5 dark:hover:bg-white/10 transition-all">
-                    <span class="material-icons-round text-sm">rule</span>语法分析
-                  </a>
-                  <a id="linkAnalysis" href="../text_analysis_report/code.html" class="min-h-[44px] rounded-xl border border-primary/15 dark:border-white/20 text-xs flex items-center justify-center gap-1 hover:bg-primary/5 dark:hover:bg-white/10 transition-all">
-                    <span class="material-icons-round text-sm">analytics</span>文本报告
-                  </a>
-                </div>
-              </div>
-            </section>
+        <!-- AI tools -->
+        <div class="pt-3 border-t border-black/8 dark:border-white/8 space-y-2">
+          <p class="text-xs font-medium opacity-60">AI 工具</p>
+          <div class="grid grid-cols-2 gap-2">
+            <a id="linkGrammar" href="../grammar_analysis_popover/code.html" class="h-9 rounded-xl border border-black/10 dark:border-white/15 text-xs flex items-center justify-center gap-1 hover:bg-black/5 dark:hover:bg-white/8 transition-colors">
+              <span class="material-icons-round text-sm">rule</span>语法分析
+            </a>
+            <a id="linkAnalysis" href="../text_analysis_report/code.html" class="h-9 rounded-xl border border-black/10 dark:border-white/15 text-xs flex items-center justify-center gap-1 hover:bg-black/5 dark:hover:bg-white/8 transition-colors">
+              <span class="material-icons-round text-sm">analytics</span>文本报告
+            </a>
           </div>
-        </aside>
+        </div>
 
-        <section id="readingPane" class="relative overflow-y-auto no-scrollbar px-4 sm:px-8 py-6 sm:py-8 pb-28 md:pb-8 bg-paper-grain">
-          <div class="max-w-[900px] mx-auto">
-            <div class="mb-8 text-center">
-              <h2 class="font-serif-header text-3xl sm:text-4xl text-primary dark:text-white">Reading Workspace</h2>
-              <p class="font-chinese text-sm sm:text-base text-primary/60 dark:text-white/70 mt-2">点击单词查询 · 逐句朗读高亮 · 适合跟读训练</p>
-            </div>
-            <div id="sentencesContainer" class="space-y-4"></div>
-          </div>
+        <p id="statusText" class="text-xs opacity-50 leading-relaxed">状态：待机。</p>
+      </section>
+    </div>
+  </aside>
 
-          <div id="wordPopover" class="word-pop hidden fixed z-50 w-[min(360px,92vw)] rounded-2xl border border-primary/10 dark:border-white/15 bg-[#FDFBF7] dark:bg-[#23211e] shadow-2xl p-4" role="dialog" aria-label="Word definition">
-            <div class="flex items-start justify-between gap-3">
-              <div>
-                <h3 id="wordTitle" class="font-serif-header text-2xl text-primary dark:text-white">Word</h3>
-                <p id="wordPhonetic" class="text-sm text-primary/65 dark:text-white/65">/phonetic/</p>
-              </div>
-              <button id="closeWordBtn" class="min-h-[44px] min-w-[44px] h-11 w-11 rounded-full text-primary/60 dark:text-white/70 hover:bg-primary/5 dark:hover:bg-white/10 transition-all" aria-label="Close word popup">
-                <span class="material-icons-round">close</span>
-              </button>
-            </div>
-            <div class="mt-3 space-y-2">
-              <p class="text-xs uppercase tracking-wider text-primary/50 dark:text-white/50">中文释义</p>
-              <p id="wordCn" class="text-sm font-chinese text-text-chinese dark:text-white/80">加载中...</p>
-              <p class="text-xs uppercase tracking-wider text-primary/50 dark:text-white/50 mt-2">English Gloss</p>
-              <p id="wordEn" class="text-sm text-primary/80 dark:text-white/80">Loading...</p>
-              <button id="saveWordBtn" class="mt-3 w-full min-h-[44px] py-2 rounded-xl bg-primary text-white text-sm hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-1.5">
-                <span class="material-icons-round text-base">bookmark_add</span>
-                <span>保存到生词本</span>
-              </button>
-            </div>
-          </div>
-        </section>
+  <!-- ═══════ MAIN READING AREA ═══════ -->
+  <main id="readingPane" class="fixed inset-0 pt-12 pb-14 overflow-y-auto no-scrollbar">
+    <div class="max-w-[680px] mx-auto px-5 sm:px-8 py-6 sm:py-10">
+      <div id="articleHeader" class="mb-10 text-center">
+        <h2 id="articleTitleMain" class="font-serif-header text-2xl sm:text-3xl">Reading Workspace</h2>
+        <p id="articleMeta" class="font-chinese text-sm opacity-50 mt-2">点击单词查询 · 逐句朗读高亮 · 按 F 进入 Zen 模式</p>
       </div>
-    </main>
+      <div id="sentencesContainer" class="space-y-1"></div>
+    </div>
+
+    <!-- Word Popover -->
+    <div id="wordPopover" class="word-pop hidden fixed z-50 w-[min(360px,92vw)] rounded-2xl border border-black/10 dark:border-white/12 bg-background-light dark:bg-surface-dark shadow-2xl p-4" role="dialog" aria-label="Word definition">
+      <div class="flex items-start justify-between gap-2">
+        <div class="min-w-0">
+          <h3 id="wordTitle" class="font-serif-header text-2xl truncate">Word</h3>
+          <p id="wordPhonetic" class="text-sm opacity-50 mt-0.5">/phonetic/</p>
+        </div>
+        <div class="flex items-center gap-1 shrink-0">
+          <button id="pronounceBtn" class="w-10 h-10 rounded-full bg-accent-sienna/10 dark:bg-accent-sienna-bright/15 text-accent-sienna dark:text-accent-sienna-bright hover:bg-accent-sienna/20 dark:hover:bg-accent-sienna-bright/25 transition-colors flex items-center justify-center" aria-label="Play pronunciation">
+            <span class="material-icons-round text-[20px]">volume_up</span>
+          </button>
+          <button id="closeWordBtn" class="w-10 h-10 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors flex items-center justify-center opacity-50 hover:opacity-80" aria-label="Close">
+            <span class="material-icons-round text-[20px]">close</span>
+          </button>
+        </div>
+      </div>
+      <div class="mt-3 space-y-2">
+        <p class="text-[10px] uppercase tracking-widest opacity-40 font-medium">中文释义</p>
+        <p id="wordCn" class="text-sm font-chinese text-text-chinese dark:text-white/70">加载中...</p>
+        <p class="text-[10px] uppercase tracking-widest opacity-40 font-medium mt-3">English Gloss</p>
+        <p id="wordEn" class="text-sm opacity-80">Loading...</p>
+        <button id="saveWordBtn" class="mt-3 w-full h-10 rounded-xl bg-primary dark:bg-white/90 text-white dark:text-primary text-sm font-medium hover:opacity-90 active:scale-[0.98] transition-all flex items-center justify-center gap-1.5">
+          <span class="material-icons-round text-base">bookmark_add</span>
+          <span>保存到生词本</span>
+        </button>
+      </div>
+    </div>
+  </main>
+
+  <!-- ═══════ TTS BOTTOM BAR ═══════ -->
+  <div id="ttsBar" class="fixed bottom-0 inset-x-0 h-14 px-3 sm:px-5 flex items-center gap-2 sm:gap-3 bg-background-light/90 dark:bg-background-dark/90 backdrop-blur-md border-t border-black/5 dark:border-white/8 z-30">
+    <button id="prevSentenceBtn" class="w-9 h-9 rounded-full flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 transition-colors opacity-60 hover:opacity-100" aria-label="Previous sentence">
+      <span class="material-icons-round text-[18px]">skip_previous</span>
+    </button>
+    <button id="playPauseBtn" class="w-10 h-10 rounded-full bg-accent-sienna dark:bg-accent-sienna-bright text-white flex items-center justify-center hover:opacity-90 active:scale-95 transition-all shadow-lg shadow-accent-sienna/25 dark:shadow-accent-sienna-bright/25" aria-label="Play / Pause">
+      <span class="material-icons-round text-[22px]" id="playPauseIcon">play_arrow</span>
+    </button>
+    <button id="nextSentenceBtn" class="w-9 h-9 rounded-full flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 transition-colors opacity-60 hover:opacity-100" aria-label="Next sentence">
+      <span class="material-icons-round text-[18px]">skip_next</span>
+    </button>
+    <span id="ttsCurrentTime" class="text-[11px] tabular-nums opacity-50 w-8 text-right shrink-0">0:00</span>
+    <input type="range" id="ttsProgress" min="0" max="100" value="0" class="flex-1 min-w-0" />
+    <span id="ttsTotalTime" class="text-[11px] tabular-nums opacity-50 w-8 shrink-0">0:00</span>
+    <button id="speedBtn" class="h-7 px-2 rounded-lg text-[11px] font-medium border border-black/10 dark:border-white/15 hover:bg-black/5 dark:hover:bg-white/10 transition-colors tabular-nums" aria-label="Playback speed">1x</button>
+    <button id="stopBtn" class="w-9 h-9 rounded-full flex items-center justify-center hover:bg-black/5 dark:hover:bg-white/10 transition-colors opacity-60 hover:opacity-100" aria-label="Stop">
+      <span class="material-icons-round text-[18px]">stop</span>
+    </button>
   </div>
 
-  <a href="../index.html" class="fixed top-4 right-4 z-40 hidden md:flex min-h-[44px] px-4 rounded-full bg-primary text-white text-sm shadow-lg hover:scale-105 active:scale-95 transition-all items-center">Hub</a>
+  <!-- ═══════ ZEN PROGRESS LINE ═══════ -->
+  <div id="zenProgressLine" class="fixed bottom-0 inset-x-0 h-[3px] bg-black/5 dark:bg-white/5 z-20 pointer-events-none">
+    <div id="zenProgressFill" class="h-full bg-accent-sienna dark:bg-accent-sienna-bright transition-[width] duration-300 ease-out" style="width:0%"></div>
+  </div>
 
-  <div id="settingsOverlay" class="settings-overlay fixed inset-0 z-40 bg-primary/30 backdrop-blur-sm"></div>
-  <aside id="settingsDrawer" class="settings-drawer fixed top-0 right-0 z-50 h-full w-full sm:w-[min(400px,92vw)] bg-[#FDFBF7] dark:bg-[#23211e] border-l border-primary/10 dark:border-white/10 shadow-2xl overflow-y-auto no-scrollbar" role="dialog" aria-modal="true" aria-label="Reading settings">
-    <div class="p-5 border-b border-primary/10 dark:border-white/10 flex items-center justify-between sticky top-0 bg-[#FDFBF7]/95 dark:bg-[#23211e]/95 backdrop-blur-sm z-10">
+  <!-- ═══════ SETTINGS DRAWER (right) ═══════ -->
+  <div id="settingsOverlay" class="settings-overlay fixed inset-0 z-40 bg-black/30 backdrop-blur-sm"></div>
+  <aside id="settingsDrawer" class="settings-drawer fixed top-0 right-0 z-50 h-full w-full sm:w-[min(400px,92vw)] bg-background-light dark:bg-surface-dark border-l border-black/5 dark:border-white/8 shadow-2xl overflow-y-auto no-scrollbar" role="dialog" aria-modal="true" aria-label="Reading settings">
+    <div class="p-5 border-b border-black/5 dark:border-white/8 flex items-center justify-between sticky top-0 bg-background-light/95 dark:bg-surface-dark/95 backdrop-blur-sm z-10">
       <div>
-        <h2 class="font-serif-header text-2xl text-primary dark:text-white">Reading Settings</h2>
-        <p class="text-xs text-primary/60 dark:text-white/60">阅读设置</p>
+        <h2 class="font-serif-header text-xl">Reading Settings</h2>
+        <p class="text-xs opacity-50">阅读设置</p>
       </div>
-      <button id="closeSettingsBtn" class="min-h-[44px] min-w-[44px] h-11 w-11 rounded-full text-primary/60 dark:text-white/70 hover:bg-primary/5 dark:hover:bg-white/10 transition-all" aria-label="Close settings">
+      <button id="closeSettingsBtn" class="w-10 h-10 rounded-full hover:bg-black/5 dark:hover:bg-white/10 transition-colors flex items-center justify-center" aria-label="Close settings">
         <span class="material-icons-round">close</span>
       </button>
     </div>
     <div class="p-5 space-y-6 pb-16">
       <section class="space-y-3">
         <div class="flex items-center justify-between">
-          <h3 class="text-sm font-semibold uppercase tracking-wide text-primary/70 dark:text-white/70">English Size / 英文字号</h3>
-          <output id="enSizeValue" class="text-sm text-primary/70 dark:text-white/70">19px</output>
+          <h3 class="text-sm font-semibold opacity-60">English Size / 英文字号</h3>
+          <output id="enSizeValue" class="text-sm opacity-60 tabular-nums">19px</output>
         </div>
-        <input id="enSizeRange" type="range" min="16" max="28" step="1" value="19" class="w-full accent-accent-sienna" />
+        <input id="enSizeRange" type="range" min="16" max="28" step="1" value="19" class="w-full accent-accent-sienna dark:accent-accent-sienna-bright" />
       </section>
       <section class="space-y-3">
         <div class="flex items-center justify-between">
-          <h3 class="text-sm font-semibold uppercase tracking-wide text-primary/70 dark:text-white/70">Chinese Size / 中文字号</h3>
-          <output id="cnSizeValue" class="text-sm text-primary/70 dark:text-white/70">15px</output>
+          <h3 class="text-sm font-semibold opacity-60">Chinese Size / 中文字号</h3>
+          <output id="cnSizeValue" class="text-sm opacity-60 tabular-nums">15px</output>
         </div>
-        <input id="cnSizeRange" type="range" min="14" max="24" step="1" value="15" class="w-full accent-accent-sienna" />
+        <input id="cnSizeRange" type="range" min="14" max="24" step="1" value="15" class="w-full accent-accent-sienna dark:accent-accent-sienna-bright" />
       </section>
       <section class="space-y-3">
-        <h3 class="text-sm font-semibold uppercase tracking-wide text-primary/70 dark:text-white/70">Line Height / 行高</h3>
+        <h3 class="text-sm font-semibold opacity-60">Line Height / 行高</h3>
         <div class="grid grid-cols-3 gap-2">
-          <button type="button" data-lh="1.5" class="settings-chip min-h-[44px] border border-primary/15 dark:border-white/20 rounded-xl text-sm transition-all" aria-pressed="false">1.5</button>
-          <button type="button" data-lh="1.8" class="settings-chip min-h-[44px] border border-primary/15 dark:border-white/20 rounded-xl text-sm transition-all" aria-pressed="true">1.8</button>
-          <button type="button" data-lh="2" class="settings-chip min-h-[44px] border border-primary/15 dark:border-white/20 rounded-xl text-sm transition-all" aria-pressed="false">2.0</button>
+          <button type="button" data-lh="1.5" class="settings-chip h-10 border border-black/10 dark:border-white/15 rounded-xl text-sm transition-all" aria-pressed="false">1.5</button>
+          <button type="button" data-lh="1.8" class="settings-chip h-10 border border-black/10 dark:border-white/15 rounded-xl text-sm transition-all" aria-pressed="true">1.8</button>
+          <button type="button" data-lh="2" class="settings-chip h-10 border border-black/10 dark:border-white/15 rounded-xl text-sm transition-all" aria-pressed="false">2.0</button>
         </div>
       </section>
     </div>
   </aside>
 
-  <nav class="fixed bottom-0 left-0 right-0 md:hidden bg-white/90 dark:bg-[#23211e]/90 backdrop-blur border-t border-primary/10 dark:border-white/10 flex justify-around py-2 z-50">
-    <a href="../library_dashboard/code.html" class="min-h-[44px] min-w-[44px] flex items-center justify-center text-primary/60"><span class="material-icons-round">library_books</span></a>
-    <a href="./code.html" class="min-h-[44px] min-w-[44px] flex items-center justify-center text-primary"><span class="material-icons-round">auto_stories</span></a>
-    <a href="../vocabulary_insights_sidebar/code.html" class="min-h-[44px] min-w-[44px] flex items-center justify-center text-primary/60"><span class="material-icons-round">school</span></a>
-    <a href="../ingest_and_analysis_modal/code.html" class="min-h-[44px] min-w-[44px] flex items-center justify-center text-primary/60"><span class="material-icons-round">upload_file</span></a>
+  <!-- ═══════ MOBILE NAV ═══════ -->
+  <nav id="mobileNav" class="fixed bottom-0 left-0 right-0 md:hidden bg-background-light/90 dark:bg-background-dark/90 backdrop-blur-md border-t border-black/5 dark:border-white/8 flex justify-around py-2 z-35 hidden">
+    <a href="../library_dashboard/code.html" class="w-11 h-11 flex items-center justify-center opacity-50"><span class="material-icons-round">library_books</span></a>
+    <a href="./code.html" class="w-11 h-11 flex items-center justify-center"><span class="material-icons-round">auto_stories</span></a>
+    <a href="../vocabulary_insights_sidebar/code.html" class="w-11 h-11 flex items-center justify-center opacity-50"><span class="material-icons-round">school</span></a>
+    <a href="../ingest_and_analysis_modal/code.html" class="w-11 h-11 flex items-center justify-center opacity-50"><span class="material-icons-round">upload_file</span></a>
   </nav>
 
   <script>
     (function () {
-      const KEYS = {
-        settings: "dfr.readingSettings.v1",
-        readingMode: "readingMode",
-        translationCache: "dfr_translation_cache_v1",
-        vocabulary: "vocabulary",
-        theme: "dfr_theme",
-        migrationDone: "dfr_migration_v1_done"
-      };
-
+      /* ═══ CONSTANTS ═══ */
+      const KEYS = { settings: "dfr.readingSettings.v1", readingMode: "readingMode", translationCache: "dfr_translation_cache_v1", vocabulary: "vocabulary", theme: "dfr_theme", migrationDone: "dfr_migration_v1_done" };
       const TTS_PROXY_ENDPOINT = "/api/tts-proxy";
-
       const TRANSLATE_API = "https://google-translate-pro.xingpeng278.workers.dev/v1/chat/completions";
       const TRANSLATE_KEY = "sk-liutianyi999";
       const TRANSLATE_MODEL = "google-translate-pro";
+      const SPEED_OPTIONS = [0.5, 0.75, 1, 1.25, 1.5, 2];
 
+      /* ═══ DOM ═══ */
+      const $ = (s) => document.getElementById(s);
+      const presetSelect = $("presetSelect"), loadPresetBtn = $("loadPresetBtn"), articleInput = $("articleInput"), renderArticleBtn = $("renderArticleBtn");
+      const voiceSelect = $("voiceSelect"), rateSelect = $("rateSelect"), readAllBtn = $("readAllBtn"), sentenceModeBtn = $("sentenceModeBtn"), stopBtn = $("stopBtn"), statusText = $("statusText");
+      const themeToggle = $("themeToggle"), articleMeta = $("articleMeta"), articleTitleBar = $("articleTitleBar"), articleTitleMain = $("articleTitleMain");
+      const sentencesContainer = $("sentencesContainer"), readingPane = $("readingPane");
+      const modeButtons = Array.from(document.querySelectorAll(".mode-btn"));
+      const wordPopover = $("wordPopover"), wordTitle = $("wordTitle"), wordPhonetic = $("wordPhonetic"), wordCn = $("wordCn"), wordEn = $("wordEn");
+      const closeWordBtn = $("closeWordBtn"), saveWordBtn = $("saveWordBtn"), pronounceBtn = $("pronounceBtn");
+      const menuBtn = $("menuBtn"), leftDrawer = $("leftDrawer"), drawerOverlay = $("drawerOverlay"), closeDrawerBtn = $("closeDrawerBtn");
+      const zenBtn = $("zenBtn"), topbar = $("topbar"), ttsBar = $("ttsBar");
+      const playPauseBtn = $("playPauseBtn"), playPauseIcon = $("playPauseIcon");
+      const prevSentenceBtn = $("prevSentenceBtn"), nextSentenceBtn = $("nextSentenceBtn");
+      const ttsProgress = $("ttsProgress"), ttsCurrentTime = $("ttsCurrentTime"), ttsTotalTime = $("ttsTotalTime");
+      const speedBtn = $("speedBtn"), zenProgressFill = $("zenProgressFill");
+
+      /* ═══ STATE ═══ */
+      const audio = new Audio();
+      const audioCache = new Map();
+      const dictionaryCache = new Map();
+      let translationCache = loadJson(KEYS.translationCache, {});
+      let translationQueue = Promise.resolve();
+      let lastTranslationRequestAt = 0;
+      let currentArticle = null, sentences = [], sentenceModeRunning = false, sentencePlayToken = 0;
+      let currentRenderToken = 0, currentHighlighted = -1, lastTtsPath = "", currentWord = null;
+      let observer = null, furthestSeenIndex = -1, progressTimer = null;
+      let isZenMode = false, zenAutoHideTimer = null, currentSpeedIdx = 2;
+      let currentSentenceIdx = 0, pronounceAudio = null;
+
+      /* ═══ UTILS ═══ */
+      function loadJson(k, fb) { try { const r = localStorage.getItem(k); return r ? JSON.parse(r) : fb; } catch { return fb; } }
+      function saveJson(k, v) { localStorage.setItem(k, JSON.stringify(v)); }
+      function delay(ms) { return new Promise(r => setTimeout(r, ms)); }
+      function setStatus(t) { statusText.textContent = `状态：${t}`; }
+      function fmtTime(s) { if (!s || !isFinite(s)) return "0:00"; const m = Math.floor(s / 60); return `${m}:${String(Math.floor(s % 60)).padStart(2, "0")}`; }
+
+      /* ═══ TRANSLATE ═══ */
       async function callTranslateAPI(text) {
-        const resp = await fetch(TRANSLATE_API, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            "Authorization": `Bearer ${TRANSLATE_KEY}`
-          },
-          body: JSON.stringify({
-            model: TRANSLATE_MODEL,
-            messages: [
-              { role: "system", content: "You are a translator. Translate the user message from English to Chinese. Only output the translation, nothing else." },
-              { role: "user", content: text }
-            ]
-          })
-        });
+        const resp = await fetch(TRANSLATE_API, { method: "POST", headers: { "Content-Type": "application/json", Authorization: `Bearer ${TRANSLATE_KEY}` }, body: JSON.stringify({ model: TRANSLATE_MODEL, messages: [{ role: "system", content: "You are a translator. Translate the user message from English to Chinese. Only output the translation, nothing else." }, { role: "user", content: text }] }) });
         if (!resp.ok) throw new Error(`Translate API HTTP ${resp.status}`);
         const data = await resp.json();
         const result = data?.choices?.[0]?.message?.content?.trim();
@@ -397,1087 +423,523 @@
         return result;
       }
 
+      /* ═══ PRESETS ═══ */
       const PRESETS = {
         ai_ethics: `The rapid development of artificial intelligence presents both opportunities and challenges for modern society. While automation promises efficiency, it also raises profound questions about the nature of human labor and creativity.\n\nWe must consider not only the economic implications but also the ethical frameworks required to govern these intelligent systems. Without robust guidelines, the potential for misuse increases significantly.\n\nFurthermore, the integration of AI into educational settings offers a chance to personalize learning experiences like never before. Adaptive algorithms can tailor content to individual student needs, fostering deeper engagement.`,
         deep_work: `Deep work is the ability to focus without distraction on cognitively demanding tasks. It allows you to quickly master complicated information and produce better results in less time.\n\nIn a world filled with notifications and fragmented attention, deep work becomes a superpower. Professionals who cultivate this skill can create rare value and maintain a meaningful sense of progress.\n\nBuilding this habit requires deliberate scheduling, clear boundaries, and regular reflection. Even one uninterrupted hour per day can compound into major long-term growth.`,
         climate: `Climate science increasingly relies on machine learning to interpret vast datasets from satellites, sensors, and ocean buoys. These models help researchers forecast extreme weather events and improve disaster preparedness.\n\nHowever, prediction quality depends on both data quality and human judgment. Scientists must continuously validate models against real-world outcomes to avoid misleading conclusions.\n\nWhen used responsibly, data-driven climate tools can guide policy, support resilient infrastructure, and protect vulnerable communities.`
       };
 
-      const presetSelect = document.getElementById("presetSelect");
-      const loadPresetBtn = document.getElementById("loadPresetBtn");
-      const articleInput = document.getElementById("articleInput");
-      const renderArticleBtn = document.getElementById("renderArticleBtn");
-      const voiceSelect = document.getElementById("voiceSelect");
-      const rateSelect = document.getElementById("rateSelect");
-      const readAllBtn = document.getElementById("readAllBtn");
-      const sentenceModeBtn = document.getElementById("sentenceModeBtn");
-      const stopBtn = document.getElementById("stopBtn");
-      const statusText = document.getElementById("statusText");
-      const themeToggle = document.getElementById("themeToggle");
-      const articleMeta = document.getElementById("articleMeta");
-      const sentencesContainer = document.getElementById("sentencesContainer");
-      const readingPane = document.getElementById("readingPane");
-      const modeButtons = Array.from(document.querySelectorAll(".mode-btn"));
-
-      const wordPopover = document.getElementById("wordPopover");
-      const wordTitle = document.getElementById("wordTitle");
-      const wordPhonetic = document.getElementById("wordPhonetic");
-      const wordCn = document.getElementById("wordCn");
-      const wordEn = document.getElementById("wordEn");
-      const closeWordBtn = document.getElementById("closeWordBtn");
-      const saveWordBtn = document.getElementById("saveWordBtn");
-
-      const audio = new Audio();
-      const audioCache = new Map();
-      const dictionaryCache = new Map();
-      let translationCache = loadJson(KEYS.translationCache, {});
-      let translationQueue = Promise.resolve();
-      let lastTranslationRequestAt = 0;
-
-      let currentArticle = null;
-      let sentences = [];
-      let sentenceModeRunning = false;
-      let sentencePlayToken = 0;
-      let currentRenderToken = 0;
-      let currentHighlighted = -1;
-      let lastTtsPath = "";
-      let currentWord = null;
-      let observer = null;
-      let furthestSeenIndex = -1;
-      let progressTimer = null;
-
-      function loadJson(key, fallback) {
-        try {
-          const raw = localStorage.getItem(key);
-          if (!raw) return fallback;
-          return JSON.parse(raw);
-        } catch (_error) {
-          return fallback;
-        }
-      }
-
-      function saveJson(key, value) {
-        localStorage.setItem(key, JSON.stringify(value));
-      }
-
-      function delay(ms) {
-        return new Promise((resolve) => window.setTimeout(resolve, ms));
-      }
-
-      function setStatus(text) {
-        statusText.textContent = `状态：${text}`;
-      }
-
-      function normalizeArticle(raw, idHint) {
-        const id = String(raw.id || idHint || `article_${Date.now()}`);
-        const text = String(raw.text || raw.content || "").trim();
-        const progress = Number.isFinite(Number(raw.progress)) ? Number(raw.progress) : 0;
-        const lastSentenceIndex = Number.isFinite(Number(raw.lastSentenceIndex)) ? Number(raw.lastSentenceIndex) : 0;
-        return {
-          id: id.startsWith("article_") ? id : `article_${id}`,
-          title: String(raw.title || "Untitled Article"),
-          text,
-          translations: raw.translations && typeof raw.translations === "object" ? raw.translations : {},
-          createdAt: raw.createdAt || new Date().toISOString(),
-          progress: Math.max(0, Math.min(100, progress)),
-          status: raw.status || "in_progress",
-          lastSentenceIndex: Math.max(0, lastSentenceIndex),
-          updatedAt: raw.updatedAt || new Date().toISOString()
-        };
-      }
-
-      function runMigrationV1() {
-        if (localStorage.getItem(KEYS.migrationDone) === "true") return;
-
-        const legacyRaw = localStorage.getItem("dfr_last_imported");
-        if (legacyRaw) {
-          try {
-            const legacy = JSON.parse(legacyRaw);
-            const migrated = normalizeArticle({
-              id: legacy.id ? `article_${legacy.id}` : `article_${Date.now()}`,
-              title: legacy.title || "Imported Text",
-              text: legacy.text || legacy.content || "",
-              translations: legacy.translations || {},
-              createdAt: legacy.createdAt || new Date().toISOString(),
-              progress: legacy.progress || 0,
-              status: legacy.status || "in_progress",
-              lastSentenceIndex: legacy.lastSentenceIndex || 0,
-              updatedAt: new Date().toISOString()
-            });
-
-            if (migrated.text) {
-              localStorage.setItem(migrated.id, JSON.stringify(migrated));
-            }
-          } catch (_error) {
-            // ignore legacy parse errors
-          }
-        }
-
-        localStorage.setItem(KEYS.migrationDone, "true");
-      }
-
+      /* ═══ THEME ═══ */
       function applyThemeFromStorage() {
         const settings = loadJson(KEYS.settings, {});
-        const storedTheme = localStorage.getItem(KEYS.theme);
-        let theme = storedTheme;
-        if (!theme && settings.theme) {
-          theme = settings.theme === "dark" ? "dark" : "light";
-        }
-        if (theme === "dark") {
-          document.documentElement.classList.add("dark");
-        } else {
-          document.documentElement.classList.remove("dark");
-        }
+        let theme = localStorage.getItem(KEYS.theme);
+        if (!theme && settings.theme) theme = settings.theme === "dark" ? "dark" : "light";
+        document.documentElement.classList.toggle("dark", theme === "dark");
       }
-
       function toggleTheme() {
         const isDark = document.documentElement.classList.toggle("dark");
         localStorage.setItem(KEYS.theme, isDark ? "dark" : "light");
-
-        const settings = loadJson(KEYS.settings, {});
-        settings.theme = isDark ? "dark" : "parchment";
-        saveJson(KEYS.settings, settings);
+        const s = loadJson(KEYS.settings, {}); s.theme = isDark ? "dark" : "parchment"; saveJson(KEYS.settings, s);
       }
 
+      /* ═══ READING SETTINGS ═══ */
       function applyReadingSettings() {
-        const settings = loadJson(KEYS.settings, {});
-        const englishSize = Number(settings.englishSize || 19);
-        const chineseSize = Number(settings.chineseSize || 15);
-        const lineHeight = Number(settings.lineHeight || 1.8);
-
-        const enClamped = Math.max(16, Math.min(28, englishSize));
-        const cnClamped = Math.max(14, Math.min(24, chineseSize));
-        const lhClamped = [1.5, 1.8, 2].includes(lineHeight) ? lineHeight : 1.8;
-
-        document.documentElement.style.setProperty("--en-size", `${enClamped}px`);
-        document.documentElement.style.setProperty("--cn-size", `${cnClamped}px`);
-        document.documentElement.style.setProperty("--line-height", `${lhClamped}`);
-
-        const enRange = document.getElementById("enSizeRange");
-        const cnRange = document.getElementById("cnSizeRange");
-        const enVal = document.getElementById("enSizeValue");
-        const cnVal = document.getElementById("cnSizeValue");
-        if (enRange) { enRange.value = enClamped; enVal.textContent = `${enClamped}px`; }
-        if (cnRange) { cnRange.value = cnClamped; cnVal.textContent = `${cnClamped}px`; }
-
-        document.querySelectorAll("[data-lh]").forEach((btn) => {
-          btn.setAttribute("aria-pressed", String(Number(btn.dataset.lh) === lhClamped));
-        });
+        const s = loadJson(KEYS.settings, {});
+        const en = Math.max(16, Math.min(28, Number(s.englishSize || 19)));
+        const cn = Math.max(14, Math.min(24, Number(s.chineseSize || 15)));
+        const lh = [1.5, 1.8, 2].includes(Number(s.lineHeight)) ? Number(s.lineHeight) : 1.8;
+        document.documentElement.style.setProperty("--en-size", `${en}px`);
+        document.documentElement.style.setProperty("--cn-size", `${cn}px`);
+        document.documentElement.style.setProperty("--line-height", `${lh}`);
+        const enR = $("enSizeRange"), cnR = $("cnSizeRange"), enV = $("enSizeValue"), cnV = $("cnSizeValue");
+        if (enR) { enR.value = en; enV.textContent = `${en}px`; }
+        if (cnR) { cnR.value = cn; cnV.textContent = `${cn}px`; }
+        document.querySelectorAll("[data-lh]").forEach(b => b.setAttribute("aria-pressed", String(Number(b.dataset.lh) === lh)));
       }
-
-      function openSettingsDrawer() {
-        document.getElementById("settingsDrawer").classList.add("drawer-open");
-        document.getElementById("settingsOverlay").classList.add("overlay-open");
-      }
-
-      function closeSettingsDrawer() {
-        document.getElementById("settingsDrawer").classList.remove("drawer-open");
-        document.getElementById("settingsOverlay").classList.remove("overlay-open");
-      }
-
+      function openSettingsDrawer() { $("settingsDrawer").classList.add("drawer-open"); $("settingsOverlay").classList.add("overlay-open"); }
+      function closeSettingsDrawer() { $("settingsDrawer").classList.remove("drawer-open"); $("settingsOverlay").classList.remove("overlay-open"); }
       function setupSettingsDrawer() {
-        document.getElementById("openSettingsBtn").addEventListener("click", openSettingsDrawer);
-        document.getElementById("closeSettingsBtn").addEventListener("click", closeSettingsDrawer);
-        document.getElementById("settingsOverlay").addEventListener("click", closeSettingsDrawer);
-
-        document.getElementById("enSizeRange").addEventListener("input", (e) => {
-          const val = Number(e.target.value);
-          const settings = loadJson(KEYS.settings, {});
-          settings.englishSize = val;
-          saveJson(KEYS.settings, settings);
-          applyReadingSettings();
-        });
-
-        document.getElementById("cnSizeRange").addEventListener("input", (e) => {
-          const val = Number(e.target.value);
-          const settings = loadJson(KEYS.settings, {});
-          settings.chineseSize = val;
-          saveJson(KEYS.settings, settings);
-          applyReadingSettings();
-        });
-
-        document.querySelectorAll("[data-lh]").forEach((btn) => {
-          btn.addEventListener("click", () => {
-            const settings = loadJson(KEYS.settings, {});
-            settings.lineHeight = Number(btn.dataset.lh);
-            saveJson(KEYS.settings, settings);
-            applyReadingSettings();
-          });
-        });
+        $("openSettingsBtn").addEventListener("click", openSettingsDrawer);
+        $("closeSettingsBtn").addEventListener("click", closeSettingsDrawer);
+        $("settingsOverlay").addEventListener("click", closeSettingsDrawer);
+        $("enSizeRange").addEventListener("input", e => { const s = loadJson(KEYS.settings, {}); s.englishSize = Number(e.target.value); saveJson(KEYS.settings, s); applyReadingSettings(); });
+        $("cnSizeRange").addEventListener("input", e => { const s = loadJson(KEYS.settings, {}); s.chineseSize = Number(e.target.value); saveJson(KEYS.settings, s); applyReadingSettings(); });
+        document.querySelectorAll("[data-lh]").forEach(btn => btn.addEventListener("click", () => { const s = loadJson(KEYS.settings, {}); s.lineHeight = Number(btn.dataset.lh); saveJson(KEYS.settings, s); applyReadingSettings(); }));
       }
 
-      function splitSentences(text) {
-        return text
-          .replace(/\s+/g, " ")
-          .split(/(?<=[.!?])\s+/)
-          .map((s) => s.trim())
-          .filter(Boolean);
+      /* ═══ LEFT DRAWER ═══ */
+      function openDrawer() { leftDrawer.classList.add("open"); drawerOverlay.classList.add("open"); }
+      function closeDrawer() { leftDrawer.classList.remove("open"); drawerOverlay.classList.remove("open"); }
+
+      /* ═══ ZEN MODE ═══ */
+      function enterZen() {
+        isZenMode = true;
+        document.body.classList.add("zen-mode", "cursor-visible");
+        topbar.classList.add("topbar-hidden");
+        ttsBar.classList.add("tts-hidden");
+        $("mobileNav")?.classList.add("hidden");
+        closeDrawer();
+        resetZenAutoHide();
+      }
+      function exitZen() {
+        isZenMode = false;
+        document.body.classList.remove("zen-mode", "cursor-visible");
+        topbar.classList.remove("topbar-hidden");
+        ttsBar.classList.remove("tts-hidden");
+        clearTimeout(zenAutoHideTimer);
+      }
+      function toggleZen() { isZenMode ? exitZen() : enterZen(); }
+      function resetZenAutoHide() {
+        if (!isZenMode) return;
+        document.body.classList.add("cursor-visible");
+        topbar.classList.remove("topbar-hidden");
+        ttsBar.classList.remove("tts-hidden");
+        clearTimeout(zenAutoHideTimer);
+        zenAutoHideTimer = setTimeout(() => {
+          if (!isZenMode) return;
+          document.body.classList.remove("cursor-visible");
+          topbar.classList.add("topbar-hidden");
+          ttsBar.classList.add("tts-hidden");
+        }, 3000);
       }
 
-      function escapeHtml(text) {
-        return text
-          .replace(/&/g, "&amp;")
-          .replace(/</g, "&lt;")
-          .replace(/>/g, "&gt;")
-          .replace(/\"/g, "&quot;")
-          .replace(/'/g, "&#039;");
-      }
-
+      /* ═══ TEXT PROCESSING ═══ */
+      function splitSentences(text) { return text.replace(/\s+/g, " ").split(/(?<=[.!?])\s+/).map(s => s.trim()).filter(Boolean); }
+      function escapeHtml(t) { return t.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;"); }
       function tokenizeSentence(sentence) {
         const parts = sentence.match(/[A-Za-z]+(?:'[A-Za-z]+)?|[^A-Za-z]+/g) || [sentence];
-        return parts.map((part) => {
-          if (/^[A-Za-z]+(?:'[A-Za-z]+)?$/.test(part)) {
-            const safe = escapeHtml(part);
-            return `<span class="word-token" tabindex="0" data-word="${safe.toLowerCase()}">${safe}</span>`;
-          }
-          return escapeHtml(part);
-        }).join("");
+        return parts.map(p => /^[A-Za-z]+(?:'[A-Za-z]+)?$/.test(p) ? `<span class="word-token" tabindex="0" data-word="${escapeHtml(p).toLowerCase()}">${escapeHtml(p)}</span>` : escapeHtml(p)).join("");
       }
-
-      function normalizeTranslationKey(sentence) {
-        return sentence.trim().toLowerCase().replace(/\s+/g, " ");
-      }
+      function normalizeTranslationKey(s) { return s.trim().toLowerCase().replace(/\s+/g, " "); }
 
       async function translateSentence(sentence) {
         const key = normalizeTranslationKey(sentence);
-        if (translationCache[key]) {
-          return translationCache[key];
-        }
-
-        const runRequest = async () => {
+        if (translationCache[key]) return translationCache[key];
+        const run = async () => {
           if (translationCache[key]) return translationCache[key];
-
           const wait = Math.max(0, 500 - (Date.now() - lastTranslationRequestAt));
           if (wait > 0) await delay(wait);
-
           lastTranslationRequestAt = Date.now();
-          let translated = "翻译暂不可用";
-
-          try {
-            translated = await callTranslateAPI(sentence);
-          } catch (_error) {
-            translated = "翻译暂不可用（网络错误）";
-          }
-
-          translationCache[key] = translated;
+          let t = "翻译暂不可用";
+          try { t = await callTranslateAPI(sentence); } catch { t = "翻译暂不可用（网络错误）"; }
+          translationCache[key] = t;
           saveJson(KEYS.translationCache, translationCache);
-          return translated;
+          return t;
         };
-
-        translationQueue = translationQueue.then(runRequest, runRequest);
+        translationQueue = translationQueue.then(run, run);
         return translationQueue;
       }
 
-      function getReadingModeFromStorage() {
-        const direct = localStorage.getItem(KEYS.readingMode);
-        if (direct) return direct;
-
-        const settings = loadJson(KEYS.settings, {});
-        const map = {
-          parallel: "bilingual",
-          "english-only": "english",
-          "chinese-only": "chinese",
-          "hover-cn": "hover-cn"
-        };
-        return map[settings.bilingualMode] || "english";
+      /* ═══ ARTICLE ═══ */
+      function normalizeArticle(raw, idHint) {
+        const id = String(raw.id || idHint || `article_${Date.now()}`);
+        return { id: id.startsWith("article_") ? id : `article_${id}`, title: String(raw.title || "Untitled Article"), text: String(raw.text || raw.content || "").trim(), translations: raw.translations && typeof raw.translations === "object" ? raw.translations : {}, createdAt: raw.createdAt || new Date().toISOString(), progress: Math.max(0, Math.min(100, Number(raw.progress) || 0)), status: raw.status || "in_progress", lastSentenceIndex: Math.max(0, Number(raw.lastSentenceIndex) || 0), updatedAt: raw.updatedAt || new Date().toISOString() };
       }
-
-      function syncReadingModeToSettings(mode) {
-        const inverse = {
-          bilingual: "parallel",
-          english: "english-only",
-          chinese: "chinese-only",
-          "hover-cn": "hover-cn"
-        };
-
-        const settings = loadJson(KEYS.settings, {});
-        settings.bilingualMode = inverse[mode] || "english-only";
-        saveJson(KEYS.settings, settings);
+      function runMigrationV1() {
+        if (localStorage.getItem(KEYS.migrationDone) === "true") return;
+        const legacyRaw = localStorage.getItem("dfr_last_imported");
+        if (legacyRaw) { try { const l = JSON.parse(legacyRaw); const m = normalizeArticle({ id: l.id ? `article_${l.id}` : `article_${Date.now()}`, title: l.title || "Imported Text", text: l.text || l.content || "", translations: l.translations || {}, createdAt: l.createdAt || new Date().toISOString(), progress: l.progress || 0, status: l.status || "in_progress", lastSentenceIndex: l.lastSentenceIndex || 0 }); if (m.text) localStorage.setItem(m.id, JSON.stringify(m)); } catch {} }
+        localStorage.setItem(KEYS.migrationDone, "true");
       }
-
-      function setReadingMode(mode) {
-        const allowed = ["english", "bilingual", "hover-cn", "chinese"];
-        const finalMode = allowed.includes(mode) ? mode : "english";
-
-        document.getElementById("readingRoot").dataset.readingMode = finalMode;
-        localStorage.setItem(KEYS.readingMode, finalMode);
-        syncReadingModeToSettings(finalMode);
-
-        modeButtons.forEach((btn) => {
-          const active = btn.dataset.mode === finalMode;
-          btn.dataset.active = String(active);
-          btn.setAttribute("aria-pressed", active ? "true" : "false");
-        });
-      }
-
-      function getAllArticleKeys() {
-        const keys = [];
-        for (let i = 0; i < localStorage.length; i += 1) {
-          const k = localStorage.key(i);
-          if (k && k.startsWith("article_")) keys.push(k);
-        }
-        return keys;
-      }
-
+      function saveCurrentArticle() { if (!currentArticle?.id) return; currentArticle.updatedAt = new Date().toISOString(); localStorage.setItem(currentArticle.id, JSON.stringify(currentArticle)); }
       function getLatestArticle() {
-        const keys = getAllArticleKeys();
-        if (!keys.length) return null;
-
-        const items = keys
-          .map((k) => {
-            try {
-              return normalizeArticle(JSON.parse(localStorage.getItem(k)), k);
-            } catch (_error) {
-              return null;
-            }
-          })
-          .filter(Boolean)
-          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-
-        return items[0] || null;
+        const keys = []; for (let i = 0; i < localStorage.length; i++) { const k = localStorage.key(i); if (k?.startsWith("article_")) keys.push(k); }
+        return keys.map(k => { try { return normalizeArticle(JSON.parse(localStorage.getItem(k)), k); } catch { return null; } }).filter(Boolean).sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt))[0] || null;
       }
 
-      function saveCurrentArticle() {
-        if (!currentArticle || !currentArticle.id) return;
-        currentArticle.updatedAt = new Date().toISOString();
-        localStorage.setItem(currentArticle.id, JSON.stringify(currentArticle));
+      /* ═══ READING MODE ═══ */
+      function getReadingModeFromStorage() {
+        const d = localStorage.getItem(KEYS.readingMode); if (d) return d;
+        const s = loadJson(KEYS.settings, {}); return { parallel: "bilingual", "english-only": "english", "chinese-only": "chinese", "hover-cn": "hover-cn" }[s.bilingualMode] || "english";
+      }
+      function setReadingMode(mode) {
+        const m = ["english", "bilingual", "hover-cn", "chinese"].includes(mode) ? mode : "english";
+        document.getElementById("readingRoot").dataset.readingMode = m;
+        localStorage.setItem(KEYS.readingMode, m);
+        const inv = { bilingual: "parallel", english: "english-only", chinese: "chinese-only", "hover-cn": "hover-cn" };
+        const s = loadJson(KEYS.settings, {}); s.bilingualMode = inv[m] || "english-only"; saveJson(KEYS.settings, s);
+        modeButtons.forEach(b => { const a = b.dataset.mode === m; b.dataset.active = String(a); b.setAttribute("aria-pressed", a ? "true" : "false"); });
       }
 
-      async function populateTranslations(renderToken) {
-        for (let i = 0; i < sentences.length; i += 1) {
-          if (renderToken !== currentRenderToken) return;
-
-          const card = sentencesContainer.querySelector(`.sentence-card[data-index="${i}"]`);
-          if (!card) continue;
-
-          const cnNode = card.querySelector(".cn-line");
-          if (!cnNode) continue;
-
-          let translated = "";
-          if (currentArticle?.translations?.[i]) {
-            translated = currentArticle.translations[i];
-          } else {
-            translated = await translateSentence(sentences[i]);
-            if (currentArticle) {
-              currentArticle.translations[i] = translated;
-            }
-          }
-
-          if (renderToken !== currentRenderToken) return;
-          cnNode.textContent = translated || "翻译暂不可用";
-        }
-
-        if (currentArticle) saveCurrentArticle();
-      }
-
-      function clearObserver() {
-        if (observer) {
-          observer.disconnect();
-          observer = null;
-        }
-      }
-
+      /* ═══ PROGRESS TRACKING ═══ */
+      function clearObserver() { if (observer) { observer.disconnect(); observer = null; } }
       function scheduleProgressPersist() {
         if (!currentArticle) return;
-        window.clearTimeout(progressTimer);
-        progressTimer = window.setTimeout(() => {
+        clearTimeout(progressTimer);
+        progressTimer = setTimeout(() => {
           const total = Math.max(1, sentences.length);
           const progress = Math.round(((furthestSeenIndex + 1) / total) * 100);
-
           currentArticle.lastSentenceIndex = Math.max(currentArticle.lastSentenceIndex || 0, furthestSeenIndex);
           currentArticle.progress = Math.max(currentArticle.progress || 0, Math.min(100, progress));
           if (currentArticle.progress >= 100) currentArticle.status = "completed";
           saveCurrentArticle();
+          updateZenProgress();
         }, 800);
       }
-
       function setupProgressObserver() {
         clearObserver();
         if (!currentArticle) return;
-
         furthestSeenIndex = Math.max(0, Number(currentArticle.lastSentenceIndex || 0));
-        const cards = Array.from(sentencesContainer.querySelectorAll(".sentence-card"));
+        const cards = Array.from(sentencesContainer.querySelectorAll(".sentence-group"));
         if (!cards.length) return;
+        observer = new IntersectionObserver(entries => {
+          entries.forEach(e => { if (!e.isIntersecting) return; const idx = Number(e.target.dataset.index); if (isFinite(idx) && idx > furthestSeenIndex) { furthestSeenIndex = idx; scheduleProgressPersist(); } });
+        }, { root: readingPane, threshold: 0.45 });
+        cards.forEach(c => observer.observe(c));
+        const ri = Math.min(cards.length - 1, Math.max(0, Number(currentArticle.lastSentenceIndex || 0)));
+        if (ri > 0) setTimeout(() => cards[ri]?.scrollIntoView({ behavior: "smooth", block: "center" }), 180);
+      }
+      function updateZenProgress() {
+        const pct = currentArticle ? Math.round(currentArticle.progress || 0) : 0;
+        zenProgressFill.style.width = `${pct}%`;
+      }
 
-        observer = new IntersectionObserver((entries) => {
-          entries.forEach((entry) => {
-            if (!entry.isIntersecting) return;
-            const idx = Number(entry.target.dataset.index);
-            if (!Number.isFinite(idx)) return;
-            if (idx > furthestSeenIndex) {
-              furthestSeenIndex = idx;
-              scheduleProgressPersist();
-            }
-          });
-        }, {
-          root: readingPane,
-          threshold: 0.45
-        });
-
-        cards.forEach((card) => observer.observe(card));
-
-        const restoreIndex = Math.min(cards.length - 1, Math.max(0, Number(currentArticle.lastSentenceIndex || 0)));
-        if (restoreIndex > 0) {
-          window.setTimeout(() => {
-            cards[restoreIndex]?.scrollIntoView({ behavior: "smooth", block: "center" });
-          }, 180);
+      /* ═══ RENDER ═══ */
+      async function populateTranslations(renderToken) {
+        for (let i = 0; i < sentences.length; i++) {
+          if (renderToken !== currentRenderToken) return;
+          const g = sentencesContainer.querySelector(`.sentence-group[data-index="${i}"]`);
+          const cn = g?.querySelector(".cn-line"); if (!cn) continue;
+          let t = currentArticle?.translations?.[i] || "";
+          if (!t) { t = await translateSentence(sentences[i]); if (currentArticle) currentArticle.translations[i] = t; }
+          if (renderToken !== currentRenderToken) return;
+          cn.textContent = t || "翻译暂不可用";
         }
+        if (currentArticle) saveCurrentArticle();
       }
 
       function renderArticleFromText(text) {
         const normalized = String(text || "").trim();
-        if (!normalized) {
-          sentencesContainer.innerHTML = '<div class="rounded-2xl border border-primary/10 dark:border-white/10 bg-white/80 dark:bg-white/5 p-4 text-sm">请输入英文文章内容。</div>';
-          sentences = [];
-          clearObserver();
-          return;
-        }
+        if (!normalized) { sentencesContainer.innerHTML = '<p class="text-center opacity-40 py-20">请输入英文文章内容。</p>'; sentences = []; clearObserver(); return; }
+        stopPlayback({ silent: true }); sentences = splitSentences(normalized); currentRenderToken++;
+        if (!sentences.length) { sentencesContainer.innerHTML = '<p class="text-center opacity-40 py-20">未识别到完整句子。</p>'; clearObserver(); return; }
 
-        stopPlayback({ silent: true });
-        sentences = splitSentences(normalized);
-        currentRenderToken += 1;
+        sentencesContainer.innerHTML = sentences.map((s, i) => {
+          const divider = i < sentences.length - 1 ? '<div class="sentence-divider"><span></span><span></span><span></span></div>' : '';
+          return `<div data-index="${i}" class="sentence-group" tabindex="0"><p class="en-line font-english text-text-english dark:text-[#E8E4DF]">${tokenizeSentence(s)}</p><p class="cn-line font-chinese text-text-chinese dark:text-[#7A756F] mt-2">翻译加载中...</p></div>${divider}`;
+        }).join("");
 
-        if (!sentences.length) {
-          sentencesContainer.innerHTML = '<div class="rounded-2xl border border-primary/10 dark:border-white/10 bg-white/80 dark:bg-white/5 p-4 text-sm">未识别到完整句子，请检查输入。</div>';
-          clearObserver();
-          return;
-        }
-
-        sentencesContainer.innerHTML = sentences.map((sentence, idx) => `
-          <article data-index="${idx}" class="sentence-card rounded-2xl border border-primary/10 dark:border-white/10 bg-white/75 dark:bg-primary/10 p-4 sm:p-5 leading-relaxed" tabindex="0">
-            <p class="en-line font-english text-text-english dark:text-white/90">${tokenizeSentence(sentence)}</p>
-            <p class="cn-line font-chinese mt-2">翻译加载中...</p>
-          </article>
-        `).join("");
-
-        setStatus(`已渲染 ${sentences.length} 句。正在准备翻译...`);
-
+        setStatus(`已渲染 ${sentences.length} 句。正在翻译...`);
         const token = currentRenderToken;
-        populateTranslations(token).then(() => {
-          if (token === currentRenderToken) {
-            setStatus(`已渲染 ${sentences.length} 句。点击单词可查词。`);
-          }
-        });
-
+        populateTranslations(token).then(() => { if (token === currentRenderToken) setStatus(`已渲染 ${sentences.length} 句。点击单词可查词。`); });
         setupProgressObserver();
+        updateZenProgress();
       }
 
       function applyLoadedArticleMeta() {
-        const linkGrammar = document.getElementById("linkGrammar");
-        const linkAnalysis = document.getElementById("linkAnalysis");
-
+        const lg = $("linkGrammar"), la = $("linkAnalysis");
         if (!currentArticle) {
-          articleMeta.textContent = "输入英文文章、点词查询、整篇朗读、逐句朗读高亮";
-          if (linkGrammar) linkGrammar.href = "../grammar_analysis_popover/code.html";
-          if (linkAnalysis) linkAnalysis.href = "../text_analysis_report/code.html";
+          articleMeta.textContent = "点击单词查询 · 逐句朗读高亮 · 按 F 进入 Zen 模式";
+          articleTitleBar.textContent = "Deep Focus Reader";
+          articleTitleMain.textContent = "Reading Workspace";
+          if (lg) lg.href = "../grammar_analysis_popover/code.html";
+          if (la) la.href = "../text_analysis_report/code.html";
           return;
         }
-
-        articleMeta.textContent = `${currentArticle.title} · 进度 ${Math.round(currentArticle.progress || 0)}% · 状态 ${currentArticle.status === "completed" ? "已完成" : "进行中"}`;
+        articleMeta.textContent = `进度 ${Math.round(currentArticle.progress || 0)}% · ${currentArticle.status === "completed" ? "已完成" : "进行中"}`;
+        articleTitleBar.textContent = currentArticle.title;
+        articleTitleMain.textContent = currentArticle.title;
         const aid = encodeURIComponent(currentArticle.id);
-        if (linkGrammar) linkGrammar.href = `../grammar_analysis_popover/code.html?article=${aid}`;
-        if (linkAnalysis) linkAnalysis.href = `../text_analysis_report/code.html?article=${aid}`;
+        if (lg) lg.href = `../grammar_analysis_popover/code.html?article=${aid}`;
+        if (la) la.href = `../text_analysis_report/code.html?article=${aid}`;
       }
 
+      /* ═══ TTS ═══ */
       function buildTtsChunks(text, maxLen = 360) {
-        const base = splitSentences(text);
-        if (!base.length) return [text];
-        const chunks = [];
-        let current = "";
-
-        base.forEach((sentence) => {
-          if (!current) {
-            current = sentence;
-          } else if ((current + " " + sentence).length <= maxLen) {
-            current += ` ${sentence}`;
-          } else {
-            chunks.push(current);
-            current = sentence;
-          }
-        });
-        if (current) chunks.push(current);
-        return chunks;
+        const base = splitSentences(text); if (!base.length) return [text];
+        const chunks = []; let cur = "";
+        base.forEach(s => { if (!cur) cur = s; else if ((cur + " " + s).length <= maxLen) cur += ` ${s}`; else { chunks.push(cur); cur = s; } });
+        if (cur) chunks.push(cur); return chunks;
       }
 
       async function synthesize(text) {
-        const voice = voiceSelect.value;
-        const rate = rateSelect.value;
-        const key = `${voice}|${rate}|${text}`;
+        const voice = voiceSelect.value, rate = rateSelect.value, key = `${voice}|${rate}|${text}`;
         if (audioCache.has(key)) return audioCache.get(key);
-
-        const payload = {
-          text,
-          voice_name: voice,
-          style: "general",
-          rate,
-          pitch: "0"
-        };
-
-        const FETCH_TIMEOUT_MS = 30000;
-        const MAX_RETRIES = 2;
-        let lastError = null;
-
+        const payload = { text, voice_name: voice, style: "general", rate, pitch: "0" };
+        const FETCH_TIMEOUT_MS = 30000, MAX_RETRIES = 2; let lastError = null;
         for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-          const controller = new AbortController();
-          const timeoutId = window.setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
-
+          const ctrl = new AbortController(); const tid = setTimeout(() => ctrl.abort(), FETCH_TIMEOUT_MS);
           try {
-            if (attempt > 0) {
-              const delayMs = 1000 * attempt;
-              console.log(`[TTS] 第 ${attempt + 1} 次重试，等待 ${delayMs}ms...`);
-              setStatus(`TTS 合成重试中（第 ${attempt + 1} 次）...`);
-              await new Promise(r => setTimeout(r, delayMs));
-            } else {
-              setStatus("TTS 合成中...");
-            }
-
-            console.log(`[TTS] 正在请求: ${TTS_PROXY_ENDPOINT}，文本长度: ${text.length}`);
-
-            const response = await fetch(TTS_PROXY_ENDPOINT, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(payload),
-              signal: controller.signal
-            });
-
-            console.log(`[TTS] 响应状态: ${response.status}，Content-Type: ${response.headers.get("content-type")}`);
-
-            if (!response.ok) {
-              const detail = await response.text();
-              throw new Error(`HTTP ${response.status} ${detail.slice(0, 120)}`);
-            }
-
-            const contentType = String(response.headers.get("content-type") || "");
-            if (!contentType.toLowerCase().startsWith("audio/")) {
-              const detail = await response.text();
-              throw new Error(`Non-audio response: ${contentType || "unknown"} ${detail.slice(0, 120)}`);
-            }
-
-            const blob = await response.blob();
-            console.log(`[TTS] 获得音频 blob: ${blob.size} bytes，type: ${blob.type}`);
-
-            if (blob.size < 100) {
-              throw new Error(`音频数据过小 (${blob.size} bytes)，可能合成失败`);
-            }
-
-            const url = URL.createObjectURL(blob);
-            audioCache.set(key, url);
-            lastTtsPath = TTS_PROXY_ENDPOINT;
-            return url;
-          } catch (error) {
-            if (error.name === "AbortError") {
-              console.warn(`[TTS] 请求超时 (${FETCH_TIMEOUT_MS / 1000}s)`);
-              lastError = new Error(`请求超时 (${FETCH_TIMEOUT_MS / 1000}秒)，网络可能不稳定`);
-            } else {
-              console.warn(`[TTS] 请求失败 (attempt ${attempt + 1}):`, error.message);
-              lastError = error;
-            }
-          } finally {
-            window.clearTimeout(timeoutId);
-          }
+            if (attempt > 0) { await delay(1000 * attempt); setStatus(`TTS 重试中（第 ${attempt + 1} 次）...`); } else { setStatus("TTS 合成中..."); }
+            const resp = await fetch(TTS_PROXY_ENDPOINT, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(payload), signal: ctrl.signal });
+            if (!resp.ok) { const d = await resp.text(); throw new Error(`HTTP ${resp.status} ${d.slice(0, 120)}`); }
+            const ct = String(resp.headers.get("content-type") || "");
+            if (!ct.toLowerCase().startsWith("audio/")) { const d = await resp.text(); throw new Error(`Non-audio: ${ct} ${d.slice(0, 120)}`); }
+            const blob = await resp.blob();
+            if (blob.size < 100) throw new Error(`音频过小 (${blob.size}b)`);
+            const url = URL.createObjectURL(blob); audioCache.set(key, url); lastTtsPath = TTS_PROXY_ENDPOINT; return url;
+          } catch (err) {
+            lastError = err.name === "AbortError" ? new Error(`超时 (${FETCH_TIMEOUT_MS / 1000}s)`) : err;
+          } finally { clearTimeout(tid); }
         }
-
-        const message = String(lastError && lastError.message ? lastError.message : lastError);
-        if (message.toLowerCase().includes("failed to fetch") || message.toLowerCase().includes("networkerror")) {
-          throw new Error("TTS 网络无法访问，请检查网络连接或刷新页面重试。");
-        }
-        throw new Error(`TTS 调用失败：${message}`);
+        const msg = String(lastError?.message || lastError);
+        throw new Error(msg.includes("fetch") || msg.includes("network") ? "TTS 网络不可用，请检查连接。" : `TTS 失败：${msg}`);
       }
 
       function waitAudioEnd() {
         return new Promise((resolve, reject) => {
-          // If audio is already ended or has no source, resolve immediately
-          if (audio.ended || audio.readyState === 0) {
-            resolve();
-            return;
-          }
-
-          const onEnd = () => { cleanup(); resolve(); };
-          const onError = () => { cleanup(); reject(new Error("Audio playback failed")); };
-          const onPause = () => {
-            // If paused and ended, treat as ended
-            if (audio.ended) { cleanup(); resolve(); }
-          };
-          const cleanup = () => {
-            audio.removeEventListener("ended", onEnd);
-            audio.removeEventListener("error", onError);
-            audio.removeEventListener("pause", onPause);
-          };
-
-          audio.addEventListener("ended", onEnd);
-          audio.addEventListener("error", onError);
-          audio.addEventListener("pause", onPause);
-
-          // Safety timeout: if audio duration is known, wait duration + 5s
-          const safetyMs = (audio.duration && isFinite(audio.duration)) ? (audio.duration * 1000 + 5000) : 120000;
-          window.setTimeout(() => { cleanup(); resolve(); }, safetyMs);
+          if (audio.ended || audio.readyState === 0) { resolve(); return; }
+          const onEnd = () => { cleanup(); resolve(); }; const onErr = () => { cleanup(); reject(new Error("Playback error")); };
+          const onPause = () => { if (audio.ended) { cleanup(); resolve(); } };
+          const cleanup = () => { audio.removeEventListener("ended", onEnd); audio.removeEventListener("error", onErr); audio.removeEventListener("pause", onPause); };
+          audio.addEventListener("ended", onEnd); audio.addEventListener("error", onErr); audio.addEventListener("pause", onPause);
+          const ms = (audio.duration && isFinite(audio.duration)) ? audio.duration * 1000 + 5000 : 120000;
+          setTimeout(() => { cleanup(); resolve(); }, ms);
         });
       }
 
+      /* ═══ TTS BAR STATE ═══ */
+      function updateTtsBar() {
+        const playing = !audio.paused && !audio.ended;
+        playPauseIcon.textContent = playing ? "pause" : "play_arrow";
+        if (audio.duration && isFinite(audio.duration)) {
+          ttsCurrentTime.textContent = fmtTime(audio.currentTime);
+          ttsTotalTime.textContent = fmtTime(audio.duration);
+          ttsProgress.value = Math.round((audio.currentTime / audio.duration) * 100);
+        }
+      }
+      audio.addEventListener("timeupdate", updateTtsBar);
+      audio.addEventListener("play", updateTtsBar);
+      audio.addEventListener("pause", updateTtsBar);
+      audio.addEventListener("ended", updateTtsBar);
+      ttsProgress.addEventListener("input", () => {
+        if (audio.duration && isFinite(audio.duration)) audio.currentTime = (ttsProgress.value / 100) * audio.duration;
+      });
+
+      /* ═══ HIGHLIGHT ═══ */
       function highlightSentence(index) {
-        const cards = Array.from(sentencesContainer.querySelectorAll(".sentence-card"));
-        cards.forEach((card, i) => card.classList.toggle("active-play", i === index));
+        sentencesContainer.querySelectorAll(".sentence-group").forEach((g, i) => {
+          g.classList.toggle("active-play", i === index);
+          g.classList.toggle("read-past", i < index);
+        });
         currentHighlighted = index;
       }
-
       function clearHighlight() {
-        const cards = Array.from(sentencesContainer.querySelectorAll(".sentence-card"));
-        cards.forEach((card) => card.classList.remove("active-play"));
-        currentHighlighted = -1;
-        clearWordHighlights();
+        sentencesContainer.querySelectorAll(".sentence-group").forEach(g => g.classList.remove("active-play", "read-past"));
+        currentHighlighted = -1; clearWordHighlights();
       }
-
       let wordHighlightTimer = null;
-
       function clearWordHighlights() {
         if (wordHighlightTimer) { clearInterval(wordHighlightTimer); wordHighlightTimer = null; }
-        sentencesContainer.querySelectorAll(".word-active, .word-spoken").forEach((el) => {
-          el.classList.remove("word-active", "word-spoken");
-        });
+        sentencesContainer.querySelectorAll(".word-active, .word-spoken").forEach(el => el.classList.remove("word-active", "word-spoken"));
       }
-
       function startWordHighlight(sentenceIndex, durationMs) {
         clearWordHighlights();
-        const card = sentencesContainer.querySelector(`.sentence-card[data-index="${sentenceIndex}"]`);
-        if (!card) return;
-
-        const wordTokens = Array.from(card.querySelectorAll(".word-token"));
-        if (!wordTokens.length) return;
-
-        // Calculate weight for each word based on character length
-        const weights = wordTokens.map((el) => {
-          const w = (el.dataset.word || el.textContent || "").length;
-          return Math.max(w, 1);
-        });
-        const totalWeight = weights.reduce((a, b) => a + b, 0);
-
-        // Build timeline: [startMs, endMs] for each word
-        let cumMs = 0;
-        const timeline = weights.map((w) => {
-          const start = cumMs;
-          const dur = (w / totalWeight) * durationMs;
-          cumMs += dur;
-          return { start, end: cumMs };
-        });
-
-        const startTime = Date.now();
-        let lastIdx = -1;
-
+        const g = sentencesContainer.querySelector(`.sentence-group[data-index="${sentenceIndex}"]`); if (!g) return;
+        const tokens = Array.from(g.querySelectorAll(".word-token")); if (!tokens.length) return;
+        const weights = tokens.map(el => Math.max((el.dataset.word || el.textContent || "").length, 1));
+        const total = weights.reduce((a, b) => a + b, 0);
+        let cum = 0; const timeline = weights.map(w => { const s = cum; cum += (w / total) * durationMs; return { start: s, end: cum }; });
+        const t0 = Date.now(); let last = -1;
         wordHighlightTimer = setInterval(() => {
-          const elapsed = Date.now() - startTime;
-          let currentIdx = -1;
-          for (let j = 0; j < timeline.length; j++) {
-            if (elapsed >= timeline[j].start && elapsed < timeline[j].end) {
-              currentIdx = j;
-              break;
-            }
-          }
-          // After last word
-          if (elapsed >= durationMs) currentIdx = wordTokens.length - 1;
-
-          if (currentIdx !== lastIdx && currentIdx >= 0) {
-            // Remove active from previous
-            if (lastIdx >= 0 && lastIdx < wordTokens.length) {
-              wordTokens[lastIdx].classList.remove("word-active");
-              wordTokens[lastIdx].classList.add("word-spoken");
-            }
-            // Add active to current
-            wordTokens[currentIdx].classList.add("word-active");
-            lastIdx = currentIdx;
-          }
-
-          if (elapsed >= durationMs + 200) {
-            clearInterval(wordHighlightTimer);
-            wordHighlightTimer = null;
-          }
+          const el = Date.now() - t0; let ci = -1;
+          for (let j = 0; j < timeline.length; j++) { if (el >= timeline[j].start && el < timeline[j].end) { ci = j; break; } }
+          if (el >= durationMs) ci = tokens.length - 1;
+          if (ci !== last && ci >= 0) { if (last >= 0 && last < tokens.length) { tokens[last].classList.remove("word-active"); tokens[last].classList.add("word-spoken"); } tokens[ci].classList.add("word-active"); last = ci; }
+          if (el >= durationMs + 200) { clearInterval(wordHighlightTimer); wordHighlightTimer = null; }
         }, 60);
       }
 
+      /* ═══ PLAYBACK ═══ */
       async function playWholeArticle() {
-        const text = articleInput.value.trim();
-        if (!text) {
-          setStatus("请先输入文章再朗读。");
-          return;
-        }
-
-        sentenceModeRunning = false;
-        sentencePlayToken += 1;
-        clearHighlight();
-
-        readAllBtn.disabled = true;
-        readAllBtn.innerHTML = '<span class="material-icons-round text-base animate-spin">autorenew</span><span>合成中...</span>';
-
+        const text = articleInput.value.trim(); if (!text) { setStatus("请先输入文章。"); return; }
+        sentenceModeRunning = false; sentencePlayToken++; clearHighlight();
+        readAllBtn.disabled = true; readAllBtn.innerHTML = '<span class="material-icons-round text-base animate-spin">autorenew</span><span>合成中...</span>';
         try {
           const chunks = buildTtsChunks(text);
-          setStatus(`整篇朗读准备中，共 ${chunks.length} 段，TTS 合成可能需要几秒...`);
-          for (let i = 0; i < chunks.length; i += 1) {
-            setStatus(`整篇朗读：第 ${i + 1}/${chunks.length} 段（合成中...）`);
+          for (let i = 0; i < chunks.length; i++) {
+            setStatus(`整篇朗读 ${i + 1}/${chunks.length}（合成中）`);
             const url = await synthesize(chunks[i]);
-            readAllBtn.innerHTML = '<span class="material-icons-round text-base">volume_up</span><span>播放中...</span>';
-            setStatus(`整篇朗读：第 ${i + 1}/${chunks.length} 段（播放中）`);
-            audio.src = url;
-            try {
-              await audio.play();
-            } catch (playErr) {
-              setStatus(`播放被浏览器拦截，请先点击页面任意位置后重试。(${playErr.name})`);
-              throw playErr;
-            }
+            setStatus(`整篇朗读 ${i + 1}/${chunks.length}（播放中）`);
+            audio.src = url; audio.playbackRate = SPEED_OPTIONS[currentSpeedIdx];
+            try { await audio.play(); } catch (e) { setStatus(`播放被拦截，请先点击页面。(${e.name})`); throw e; }
             await waitAudioEnd();
           }
-          setStatus(`整篇朗读完成。(${lastTtsPath || "TTS"})`);
-        } catch (error) {
-          setStatus(`整篇朗读出错：${error.name || "Error"} - ${error.message}`);
-        } finally {
-          readAllBtn.disabled = false;
-          readAllBtn.innerHTML = '<span class="material-icons-round text-base">volume_up</span><span>整篇朗读</span>';
+          setStatus("整篇朗读完成。");
+        } catch (e) { setStatus(`朗读出错：${e.message}`); } finally {
+          readAllBtn.disabled = false; readAllBtn.innerHTML = '<span class="material-icons-round text-base">volume_up</span><span>整篇朗读</span>';
         }
       }
 
-      async function playSentenceMode() {
-        if (!sentences.length) {
-          setStatus("请先生成阅读内容。");
-          return;
-        }
-
-        const token = ++sentencePlayToken;
-        sentenceModeRunning = true;
+      async function playSentenceMode(startIdx = 0) {
+        if (!sentences.length) { setStatus("请先生成阅读内容。"); return; }
+        const token = ++sentencePlayToken; sentenceModeRunning = true; currentSentenceIdx = startIdx;
         sentenceModeBtn.innerHTML = '<span class="material-icons-round text-base animate-spin">autorenew</span><span>合成中...</span>';
-
         try {
-          for (let i = 0; i < sentences.length; i += 1) {
+          for (let i = startIdx; i < sentences.length; i++) {
             if (!sentenceModeRunning || token !== sentencePlayToken) break;
-            highlightSentence(i);
-
-            const card = sentencesContainer.querySelector(`.sentence-card[data-index="${i}"]`);
-            if (card) card.scrollIntoView({ behavior: "smooth", block: "center" });
-
-            setStatus(`逐句朗读：第 ${i + 1}/${sentences.length} 句（合成中...）`);
+            currentSentenceIdx = i; highlightSentence(i);
+            const g = sentencesContainer.querySelector(`.sentence-group[data-index="${i}"]`);
+            if (g) g.scrollIntoView({ behavior: "smooth", block: "center" });
+            setStatus(`逐句 ${i + 1}/${sentences.length}（合成中）`);
             const url = await synthesize(sentences[i]);
             if (!sentenceModeRunning || token !== sentencePlayToken) break;
-
-            sentenceModeBtn.innerHTML = '<span class="material-icons-round text-base">pause</span><span>播放中...</span>';
-            setStatus(`逐句朗读：第 ${i + 1}/${sentences.length} 句（播放中）`);
-            audio.src = url;
-            try {
-              await audio.play();
-            } catch (playErr) {
-              setStatus(`播放被浏览器拦截，请先点击页面任意位置后重试。(${playErr.name})`);
-              throw playErr;
-            }
-            // Start word-by-word highlight based on audio duration
-            const dur = (audio.duration && isFinite(audio.duration)) ? audio.duration * 1000 : (sentences[i].split(/\s+/).length * 350);
-            startWordHighlight(i, dur);
-            await waitAudioEnd();
-            clearWordHighlights();
+            setStatus(`逐句 ${i + 1}/${sentences.length}（播放中）`);
+            audio.src = url; audio.playbackRate = SPEED_OPTIONS[currentSpeedIdx];
+            try { await audio.play(); } catch (e) { setStatus(`播放被拦截。(${e.name})`); throw e; }
+            const dur = (audio.duration && isFinite(audio.duration)) ? audio.duration * 1000 : sentences[i].split(/\s+/).length * 350;
+            startWordHighlight(i, dur); await waitAudioEnd(); clearWordHighlights();
             if (sentenceModeRunning) sentenceModeBtn.innerHTML = '<span class="material-icons-round text-base animate-spin">autorenew</span><span>合成中...</span>';
           }
-
-          if (token === sentencePlayToken) {
-            setStatus(`逐句朗读完成。(${lastTtsPath || "TTS"})`);
-          }
-        } catch (error) {
-          setStatus(`逐句朗读出错：${error.name || "Error"} - ${error.message}`);
-        } finally {
-          if (token === sentencePlayToken) {
-            sentenceModeRunning = false;
-            sentenceModeBtn.innerHTML = '<span class="material-icons-round text-base">record_voice_over</span><span>逐句朗读</span>';
-            clearHighlight();
-          }
+          if (token === sentencePlayToken) setStatus("逐句朗读完成。");
+        } catch (e) { setStatus(`出错：${e.message}`); } finally {
+          if (token === sentencePlayToken) { sentenceModeRunning = false; sentenceModeBtn.innerHTML = '<span class="material-icons-round text-base">record_voice_over</span><span>逐句朗读</span>'; clearHighlight(); }
         }
       }
 
-      function stopPlayback(options = {}) {
-        const { silent = false } = options;
-        sentenceModeRunning = false;
-        sentencePlayToken += 1;
-        audio.pause();
-        audio.currentTime = 0;
+      function stopPlayback(opts = {}) {
+        sentenceModeRunning = false; sentencePlayToken++;
+        audio.pause(); audio.currentTime = 0;
         sentenceModeBtn.innerHTML = '<span class="material-icons-round text-base">record_voice_over</span><span>逐句朗读</span>';
-        clearHighlight();
-        if (!silent) setStatus("播放已停止。");
+        clearHighlight(); if (!opts.silent) setStatus("已停止。");
+        playPauseIcon.textContent = "play_arrow";
+        ttsProgress.value = 0; ttsCurrentTime.textContent = "0:00"; ttsTotalTime.textContent = "0:00";
       }
 
-      function sanitizeWord(raw) {
-        return String(raw || "").toLowerCase().replace(/[^a-z']/g, "");
-      }
+      /* ═══ TTS BAR CONTROLS ═══ */
+      playPauseBtn.addEventListener("click", () => {
+        if (audio.paused && audio.src) { audio.playbackRate = SPEED_OPTIONS[currentSpeedIdx]; audio.play(); }
+        else if (!audio.paused) { audio.pause(); }
+        else { playSentenceMode(0); }
+      });
+      prevSentenceBtn.addEventListener("click", () => {
+        if (sentences.length && sentenceModeRunning) { const prev = Math.max(0, currentSentenceIdx - 1); stopPlayback({ silent: true }); playSentenceMode(prev); }
+      });
+      nextSentenceBtn.addEventListener("click", () => {
+        if (sentences.length && sentenceModeRunning) { const next = Math.min(sentences.length - 1, currentSentenceIdx + 1); stopPlayback({ silent: true }); playSentenceMode(next); }
+      });
+      speedBtn.addEventListener("click", () => {
+        currentSpeedIdx = (currentSpeedIdx + 1) % SPEED_OPTIONS.length;
+        const spd = SPEED_OPTIONS[currentSpeedIdx];
+        speedBtn.textContent = spd === 1 ? "1x" : `${spd}x`;
+        audio.playbackRate = spd;
+      });
 
-      function getVocabulary() {
-        const list = loadJson(KEYS.vocabulary, []);
-        return Array.isArray(list) ? list : [];
-      }
-
-      function setVocabulary(list) {
-        saveJson(KEYS.vocabulary, list);
-      }
-
-      function isWordSaved(word) {
-        return getVocabulary().some((item) => String(item.word || "").toLowerCase() === word.toLowerCase());
-      }
-
-      function updateSaveWordButton(word) {
-        const saved = word && isWordSaved(word);
-        saveWordBtn.disabled = Boolean(saved);
-        saveWordBtn.classList.toggle("bg-primary", !saved);
-        saveWordBtn.classList.toggle("bg-primary/30", Boolean(saved));
+      /* ═══ WORD POPOVER ═══ */
+      function sanitizeWord(raw) { return String(raw || "").toLowerCase().replace(/[^a-z']/g, ""); }
+      function getVocabulary() { const l = loadJson(KEYS.vocabulary, []); return Array.isArray(l) ? l : []; }
+      function setVocabulary(l) { saveJson(KEYS.vocabulary, l); }
+      function isWordSaved(w) { return getVocabulary().some(i => String(i.word || "").toLowerCase() === w.toLowerCase()); }
+      function updateSaveWordButton(w) {
+        const saved = w && isWordSaved(w); saveWordBtn.disabled = Boolean(saved);
+        saveWordBtn.classList.toggle("opacity-50", Boolean(saved));
         saveWordBtn.querySelector("span:last-child").textContent = saved ? "已收藏 ✓" : "保存到生词本";
       }
 
+      let lastDictAudioUrl = null;
       async function fetchWordDefinition(word) {
         if (dictionaryCache.has(word)) return dictionaryCache.get(word);
-
-        const result = {
-          phonetic: "N/A",
-          en: "No definition found.",
-          cn: "暂无中文释义"
-        };
-
+        const result = { phonetic: "N/A", en: "No definition found.", cn: "暂无中文释义", audioUrl: null };
         try {
-          const dictResp = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`);
-          if (dictResp.ok) {
-            const dictData = await dictResp.json();
-            const first = dictData[0] || {};
-            const meanings = first.meanings || [];
-            const firstDef = meanings[0]?.definitions?.[0]?.definition;
-            const phonetic = first.phonetic || (first.phonetics || []).find((p) => p.text)?.text;
-
+          const resp = await fetch(`https://api.dictionaryapi.dev/api/v2/entries/en/${encodeURIComponent(word)}`);
+          if (resp.ok) {
+            const data = await resp.json(); const first = data[0] || {};
+            const meanings = first.meanings || []; const def = meanings[0]?.definitions?.[0]?.definition;
+            const phonetic = first.phonetic || (first.phonetics || []).find(p => p.text)?.text;
+            const audioUrl = (first.phonetics || []).find(p => p.audio)?.audio;
             if (phonetic) result.phonetic = phonetic;
-            if (firstDef) result.en = firstDef;
+            if (def) result.en = def;
+            if (audioUrl) result.audioUrl = audioUrl;
           }
-        } catch (_error) {
-          // ignore
-        }
-
-        try {
-          const toTranslate = result.en && result.en !== "No definition found." ? result.en : word;
-          result.cn = await callTranslateAPI(toTranslate);
-        } catch (_error) {
-          // ignore
-        }
-
-        dictionaryCache.set(word, result);
-        return result;
+        } catch {}
+        try { result.cn = await callTranslateAPI(result.en !== "No definition found." ? result.en : word); } catch {}
+        dictionaryCache.set(word, result); return result;
       }
 
       function showWordPopover(anchorEl) {
-        const rect = anchorEl.getBoundingClientRect();
-        const popW = Math.min(360, window.innerWidth * 0.92);
-
-        let left = rect.left + window.scrollX;
-        if (left + popW > window.scrollX + window.innerWidth - 8) {
-          left = window.scrollX + window.innerWidth - popW - 8;
-        }
-        if (left < 8) left = 8;
-
-        const top = rect.bottom + window.scrollY + 10;
-        wordPopover.style.left = `${left}px`;
-        wordPopover.style.top = `${top}px`;
-        wordPopover.classList.remove("hidden");
-        wordPopover.classList.add("visible");
+        const rect = anchorEl.getBoundingClientRect(); const popW = Math.min(360, window.innerWidth * 0.92);
+        let left = rect.left; if (left + popW > window.innerWidth - 8) left = window.innerWidth - popW - 8; if (left < 8) left = 8;
+        wordPopover.style.left = `${left}px`; wordPopover.style.top = `${rect.bottom + 10}px`;
+        wordPopover.classList.remove("hidden"); wordPopover.classList.add("visible");
       }
-
-      function hideWordPopover() {
-        wordPopover.classList.remove("visible");
-        wordPopover.classList.add("hidden");
-      }
+      function hideWordPopover() { wordPopover.classList.remove("visible"); wordPopover.classList.add("hidden"); }
 
       async function handleWordClick(target) {
-        const word = sanitizeWord(target.dataset.word || "");
-        if (!word) return;
-
-        currentWord = null;
-        wordTitle.textContent = word;
-        wordPhonetic.textContent = "加载中...";
-        wordCn.textContent = "正在查询中文释义...";
-        wordEn.textContent = "Loading definition...";
-        updateSaveWordButton(word);
-        showWordPopover(target);
-
+        const word = sanitizeWord(target.dataset.word || ""); if (!word) return;
+        currentWord = null; lastDictAudioUrl = null;
+        wordTitle.textContent = word; wordPhonetic.textContent = "..."; wordCn.textContent = "查询中..."; wordEn.textContent = "Loading...";
+        pronounceBtn.classList.toggle("opacity-30", true);
+        updateSaveWordButton(word); showWordPopover(target);
         const data = await fetchWordDefinition(word);
-        currentWord = {
-          word,
-          phonetic: data.phonetic,
-          en: data.en,
-          cn: data.cn
-        };
-
-        wordTitle.textContent = word;
-        wordPhonetic.textContent = data.phonetic;
-        wordCn.textContent = data.cn;
-        wordEn.textContent = data.en;
+        currentWord = { word, phonetic: data.phonetic, en: data.en, cn: data.cn };
+        lastDictAudioUrl = data.audioUrl;
+        wordTitle.textContent = word; wordPhonetic.textContent = data.phonetic; wordCn.textContent = data.cn; wordEn.textContent = data.en;
+        pronounceBtn.classList.toggle("opacity-30", !data.audioUrl);
         updateSaveWordButton(word);
       }
+
+      pronounceBtn.addEventListener("click", () => {
+        if (!lastDictAudioUrl && currentWord) {
+          synthesize(currentWord.word).then(url => { pronounceAudio = new Audio(url); pronounceAudio.play(); }).catch(() => {});
+          return;
+        }
+        if (lastDictAudioUrl) { pronounceAudio = new Audio(lastDictAudioUrl); pronounceAudio.play(); }
+      });
 
       function saveCurrentWord() {
         if (!currentWord) return;
-
         const vocab = getVocabulary();
-        const exists = vocab.some((item) => String(item.word || "").toLowerCase() === currentWord.word.toLowerCase());
-        if (exists) {
-          updateSaveWordButton(currentWord.word);
-          return;
-        }
-
-        vocab.unshift({
-          word: currentWord.word,
-          phonetic: currentWord.phonetic,
-          en: currentWord.en,
-          cn: currentWord.cn,
-          savedAt: new Date().toISOString(),
-          reviewCount: 0,
-          lastReview: null
-        });
-
-        setVocabulary(vocab);
-        updateSaveWordButton(currentWord.word);
-        setStatus(`已收藏单词：${currentWord.word}`);
+        if (vocab.some(i => String(i.word || "").toLowerCase() === currentWord.word.toLowerCase())) { updateSaveWordButton(currentWord.word); return; }
+        vocab.unshift({ word: currentWord.word, phonetic: currentWord.phonetic, en: currentWord.en, cn: currentWord.cn, savedAt: new Date().toISOString(), reviewCount: 0, lastReview: null });
+        setVocabulary(vocab); updateSaveWordButton(currentWord.word); setStatus(`已收藏：${currentWord.word}`);
       }
 
-      function loadPreset() {
-        const key = presetSelect.value;
-        const text = PRESETS[key] || "";
-        articleInput.value = text;
-
-        currentArticle = null;
-        applyLoadedArticleMeta();
-        renderArticleFromText(text);
-      }
-
+      /* ═══ LOAD / RENDER ═══ */
+      function loadPreset() { const t = PRESETS[presetSelect.value] || ""; articleInput.value = t; currentArticle = null; applyLoadedArticleMeta(); renderArticleFromText(t); closeDrawer(); }
       function renderFromEditor() {
-        const text = articleInput.value.trim();
-        if (!text) {
-          setStatus("请输入英文文章内容。");
-          return;
-        }
-
-        if (currentArticle) {
-          currentArticle.text = text;
-          currentArticle.translations = {};
-          currentArticle.status = "in_progress";
-          currentArticle.progress = 0;
-          currentArticle.lastSentenceIndex = 0;
-          saveCurrentArticle();
-          applyLoadedArticleMeta();
-        }
-
-        renderArticleFromText(text);
+        const t = articleInput.value.trim(); if (!t) { setStatus("请输入内容。"); return; }
+        if (currentArticle) { currentArticle.text = t; currentArticle.translations = {}; currentArticle.status = "in_progress"; currentArticle.progress = 0; currentArticle.lastSentenceIndex = 0; saveCurrentArticle(); applyLoadedArticleMeta(); }
+        renderArticleFromText(t); closeDrawer();
       }
-
       function loadArticleFromUrl() {
-        const params = new URLSearchParams(window.location.search);
-        const articleId = params.get("article");
-
-        if (articleId) {
-          const raw = localStorage.getItem(articleId);
-          if (raw) {
-            try {
-              currentArticle = normalizeArticle(JSON.parse(raw), articleId);
-              articleInput.value = currentArticle.text;
-              applyLoadedArticleMeta();
-              renderArticleFromText(currentArticle.text);
-              setStatus(`已加载文章：${currentArticle.title}`);
-              return true;
-            } catch (_error) {
-              setStatus("文章数据损坏，已回退到预设模式。");
-            }
-          }
-        }
-
-        if (params.get("source") === "import") {
-          const latest = getLatestArticle();
-          if (latest) {
-            currentArticle = latest;
-            articleInput.value = currentArticle.text;
-            applyLoadedArticleMeta();
-            renderArticleFromText(currentArticle.text);
-            setStatus(`已加载最近导入文章：${currentArticle.title}`);
-            return true;
-          }
-        }
-
+        const params = new URLSearchParams(location.search), aid = params.get("article");
+        if (aid) { const raw = localStorage.getItem(aid); if (raw) { try { currentArticle = normalizeArticle(JSON.parse(raw), aid); articleInput.value = currentArticle.text; applyLoadedArticleMeta(); renderArticleFromText(currentArticle.text); return true; } catch {} } }
+        if (params.get("source") === "import") { const latest = getLatestArticle(); if (latest) { currentArticle = latest; articleInput.value = currentArticle.text; applyLoadedArticleMeta(); renderArticleFromText(currentArticle.text); return true; } }
         return false;
       }
 
+      /* ═══ SWIPE GESTURE FOR DRAWER ═══ */
+      let touchStartX = 0, touchStartY = 0, swiping = false;
+      document.addEventListener("touchstart", e => { touchStartX = e.touches[0].clientX; touchStartY = e.touches[0].clientY; swiping = touchStartX < 30; }, { passive: true });
+      document.addEventListener("touchmove", e => { if (!swiping) return; const dx = e.touches[0].clientX - touchStartX; const dy = Math.abs(e.touches[0].clientY - touchStartY); if (dx > 60 && dy < 40 && !leftDrawer.classList.contains("open")) { openDrawer(); swiping = false; } }, { passive: true });
+
+      /* ═══ EVENT LISTENERS ═══ */
       function setupListeners() {
         themeToggle.addEventListener("click", toggleTheme);
-
+        menuBtn.addEventListener("click", openDrawer);
+        closeDrawerBtn.addEventListener("click", closeDrawer);
+        drawerOverlay.addEventListener("click", closeDrawer);
+        zenBtn.addEventListener("click", toggleZen);
         loadPresetBtn.addEventListener("click", loadPreset);
         renderArticleBtn.addEventListener("click", renderFromEditor);
-        readAllBtn.addEventListener("click", playWholeArticle);
-
-        sentenceModeBtn.addEventListener("click", () => {
-          if (sentenceModeRunning) {
-            stopPlayback();
-          } else {
-            playSentenceMode();
-          }
-        });
-
+        readAllBtn.addEventListener("click", () => { closeDrawer(); playWholeArticle(); });
+        sentenceModeBtn.addEventListener("click", () => { closeDrawer(); sentenceModeRunning ? stopPlayback() : playSentenceMode(0); });
         stopBtn.addEventListener("click", () => stopPlayback());
-
-        modeButtons.forEach((btn) => {
-          btn.addEventListener("click", () => {
-            setReadingMode(btn.dataset.mode);
-          });
-        });
-
-        sentencesContainer.addEventListener("click", (event) => {
-          const token = event.target.closest(".word-token");
-          if (token) handleWordClick(token);
-        });
-
-        sentencesContainer.addEventListener("keydown", (event) => {
-          const token = event.target.closest(".word-token");
-          if (!token) return;
-          if (event.key === "Enter" || event.key === " ") {
-            event.preventDefault();
-            handleWordClick(token);
-          }
-        });
-
+        modeButtons.forEach(b => b.addEventListener("click", () => setReadingMode(b.dataset.mode)));
+        sentencesContainer.addEventListener("click", e => { const t = e.target.closest(".word-token"); if (t) handleWordClick(t); });
+        sentencesContainer.addEventListener("keydown", e => { const t = e.target.closest(".word-token"); if (t && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); handleWordClick(t); } });
         saveWordBtn.addEventListener("click", saveCurrentWord);
         closeWordBtn.addEventListener("click", hideWordPopover);
+        document.addEventListener("click", e => { if (wordPopover.classList.contains("hidden")) return; if (!wordPopover.contains(e.target) && !e.target.closest(".word-token")) hideWordPopover(); });
 
-        document.addEventListener("click", (event) => {
-          if (wordPopover.classList.contains("hidden")) return;
-          const withinPopover = wordPopover.contains(event.target);
-          const onWord = event.target.closest(".word-token");
-          if (!withinPopover && !onWord) hideWordPopover();
+        document.addEventListener("keydown", e => {
+          if (e.key === "Escape") { if (isZenMode) { exitZen(); return; } closeSettingsDrawer(); closeDrawer(); hideWordPopover(); if (sentenceModeRunning || !audio.paused) stopPlayback(); }
+          if (e.key === "f" || e.key === "F") { if (e.target.tagName === "INPUT" || e.target.tagName === "TEXTAREA" || e.target.tagName === "SELECT") return; e.preventDefault(); toggleZen(); }
         });
-
-        document.addEventListener("keydown", (event) => {
-          if (event.key === "Escape") {
-            closeSettingsDrawer();
-            hideWordPopover();
-            if (sentenceModeRunning || !audio.paused) {
-              stopPlayback();
-            }
-          }
-        });
+        document.addEventListener("mousemove", () => { if (isZenMode) resetZenAutoHide(); });
+        document.addEventListener("touchstart", () => { if (isZenMode) resetZenAutoHide(); }, { passive: true });
       }
 
+      /* ═══ INIT ═══ */
       function init() {
-        runMigrationV1();
-        applyThemeFromStorage();
-        applyReadingSettings();
-
-        const initialMode = getReadingModeFromStorage();
-        setReadingMode(initialMode);
-
-        setupListeners();
-        setupSettingsDrawer();
-
-        const loaded = loadArticleFromUrl();
-        if (!loaded) {
-          loadPreset();
-          setStatus("就绪。你可以替换文章并开始学习。");
-        }
+        runMigrationV1(); applyThemeFromStorage(); applyReadingSettings();
+        setReadingMode(getReadingModeFromStorage());
+        setupListeners(); setupSettingsDrawer();
+        if (!loadArticleFromUrl()) { loadPreset(); setStatus("就绪。按 F 进入 Zen 模式。"); }
       }
 
-      window.addEventListener("beforeunload", () => {
-        audioCache.forEach((url) => URL.revokeObjectURL(url));
-        clearObserver();
-      });
-
+      window.addEventListener("beforeunload", () => { audioCache.forEach(url => URL.revokeObjectURL(url)); clearObserver(); });
       init();
     })();
   </script>
